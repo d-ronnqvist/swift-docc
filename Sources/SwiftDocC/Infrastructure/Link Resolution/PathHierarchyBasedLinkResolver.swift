@@ -74,7 +74,7 @@ final class PathHierarchyBasedLinkResolver {
                 container.storage.compactMap { element in
                     guard let childID = element.node.identifier, // Don't include sparse nodes
                           !element.node.isDisfavoredInCollision, // Don't include disfavored collisions
-                          !element.node.languages.isDisjoint(with: languagesFilter)
+                          languagesFilter.isEmpty || !element.node.languages.isDisjoint(with: languagesFilter) 
                     else {
                         return nil
                     }
@@ -87,7 +87,7 @@ final class PathHierarchyBasedLinkResolver {
         if node.languages.isSuperset(of: languagesFilter) {
             results.formUnion(directDescendants(of: node))
         }
-        if let counterpart = node.counterpart, counterpart.languages.isSubset(of: languagesFilter) {
+        if let counterpart = node.counterpart, counterpart.languages.isSuperset(of: languagesFilter) {
             results.formUnion(directDescendants(of: counterpart))
         }
         return results
