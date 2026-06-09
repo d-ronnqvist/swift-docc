@@ -19,9 +19,9 @@ private import DocCCommon
 
 package extension MarkdownRenderer {
     /// Creates an HTML element for the breadcrumbs that lead to the renderer's current page.
-    func breadcrumbs(references: [URL], currentPageNames: LinkedElement.Names) -> XMLNode {
+    func breadcrumbs(references: [URL], currentPageNames: LinkedElement.Names) -> HTMLElement {
         // Breadcrumbs handle symbols differently than most elements in that everything uses a default style (no "code voice")
-        func nameElements(for names: LinkedElement.Names) -> [XMLNode] {
+        func nameElements(for names: LinkedElement.Names) -> [HTMLElement] {
             switch names {
             case .single(.conceptual(let name)), .single(.symbol(let name)):
                 return [.text(name)]
@@ -35,7 +35,7 @@ package extension MarkdownRenderer {
                     } else {
                         names.map { language, name in
                             // Wrap the name in a span so that it can be given a language specific "class" attribute.
-                            .element(named: "span", children: [.text(name)], attributes: ["class": "\(language.id)-only"])
+                            .element(.span, children: [.text(name)], attributes: ["class": "\(language.id)-only"])
                         }
                     }
                 case .conciseness:
@@ -46,23 +46,23 @@ package extension MarkdownRenderer {
         }
         
         // Create links for each of the breadcrumbs
-        var items: [XMLNode] = references.compactMap {
+        var items: [HTMLElement] = references.compactMap {
             linkProvider.element(for: $0).map { page in
-                .element(named: "li", children: [
-                    .element(named: "a", children: nameElements(for: page.names), attributes: ["href": self.path(to: page.path)])
+                .element(.li, children: [
+                    .element(.a, children: nameElements(for: page.names), attributes: ["href": self.path(to: page.path)])
                 ])
             }
         }
         
         // Add the name of the current page. It doesn't display as a link because it would refer to the current page.
         items.append(
-            .element(named: "li", children: nameElements(for: currentPageNames))
+            .element(.li, children: nameElements(for: currentPageNames))
         )
-        let list = XMLNode.element(named: "ul", children: items)
+        let list = HTMLElement.element(.ul, children: items)
         
         return switch goal {
         case .conciseness: list // If the goal is conciseness, don't wrap the list in a `<nav>` HTML element with an "id".
-        case .richness:    .element(named: "nav", children: [list], attributes: ["id": "breadcrumbs"])
+        case .richness:    .element(.nav, children: [list], attributes: ["id": "breadcrumbs"])
         }
     }
 }

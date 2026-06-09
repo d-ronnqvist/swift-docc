@@ -148,7 +148,7 @@ package struct HTMLRenderer {
         ///
         /// The string representation of this node hierarchy is intended to be inserted _somewhere_ inside the `<body>` HTML element.
         /// It _doesn't_ include a page header, footer, navigator, etc. and may be an insufficient representation of the "entire" page
-        var content: XMLNode
+        var content: HTMLElement
         /// The title and description/abstract of the page.
         var metadata: Metadata
         /// Meta information about the page that belongs in the HTML `<head>` element.
@@ -163,35 +163,34 @@ package struct HTMLRenderer {
     mutating func renderArticle(_ article: Article) -> RenderedPageInfo {
         let node = context.documentationCache[reference]!
         
-        let articleElement = XMLElement(name: "article")
-        let hero = XMLNode.element(named: "section")
+        var articleElement = HTMLElement.element(.article, children: [])
+        var hero = HTMLElement.element(.section, children: [])
         if goal == .richness {
             // Draw a background color for the hero section and an article/collection glyph
             hero.addAttributes(["id": "hero", "class": article.topics == nil ? "article" : "api-collection"])
         }
         articleElement.addChild(hero)
         
-        // Breadcrumbs
+        // Breadcrumbs and Eyebrow
         hero.addChild(renderer.breadcrumbs(
             references: (context.shortestFinitePath(to: reference) ?? [context.soleRootModuleReference!]).map { $0.url },
             currentPageNames: .single(.conceptual(node.name.plainText))
         ))
-        // Eyebrow and title
+        addEyebrow(text: article.topics == nil ? "Article": "API Collection", to: &hero)
+        
+        // Title
         hero.addChild(
-            .element(named: "hgroup", children: [
-                .element(named: "p", children: [.text(article.topics == nil ? "Article": "API Collection")]),
-                .element(named: "h1", children: [.text(node.name.plainText)]),
-            ])
+            .element(.h1, children: [.text(node.name.plainText)])
         )
         
         // Abstract
         if let abstract = article.abstract {
-            hero.addChild(renderer.visit(abstract))
+            addAbstract(abstract, to: &hero)
         }
         
         // Deprecation message
         if let deprecationMessage = article.deprecationSummary?.elements {
-            addDeprecationSummary(markup: deprecationMessage, to: hero)
+            addDeprecationSummary(markup: deprecationMessage, to: &hero)
         }
         
         // Discussion
@@ -203,7 +202,7 @@ package struct HTMLRenderer {
         
         // Topics
         if let topics = article.topics {
-            separateSectionsIfNeeded(in: articleElement)
+            separateSectionsIfNeeded(in: &articleElement)
             
             // TODO: Support language specific topic sections, indicated using @SupportedLanguage directives (rdar://166308418)
             articleElement.addChildren(
@@ -220,7 +219,7 @@ package struct HTMLRenderer {
         
         // See Also
         if let seeAlso = article.seeAlso {
-            addSeeAlso(seeAlso, to: articleElement)
+            addSeeAlso(seeAlso, to: &articleElement)
         }
         // _Automatic_ See Also sections are very heavily tied into the RenderJSON model and require information from the JSON to determine.
         
@@ -236,9 +235,8 @@ package struct HTMLRenderer {
     mutating func renderSymbol(_ symbol: Symbol) -> RenderedPageInfo {
         let node = context.documentationCache[reference]!
         
-        let articleElement = XMLElement(name: "article")
-        let hero = XMLElement(name: "section")
-        articleElement.addChild(hero)
+        var articleElement = HTMLElement.element(.article, children: [])
+        var hero = HTMLElement.element(.section, children: [])
         let isModule = symbol.kind.identifier == .module
         
         if isModule {
@@ -247,39 +245,36 @@ package struct HTMLRenderer {
                 hero.addAttributes(["id": "hero", "class": "module"])
             }
         } else {
-            // Breadcrumbs
+            // Breadcrumbs and Eyebrow
             hero.addChild(renderer.breadcrumbs(
                 references: (context.linkResolver.localResolver.breadcrumbs(of: reference, in: reference.sourceLanguage) ?? []).map { $0.url },
                 currentPageNames: node.makeNames(goal: goal)
             ))
         }
+        addEyebrow(text: symbol.roleHeading, to: &hero)
         
-        // Eyebrow and title
-        let hgroup = XMLNode.element(named: "hgroup", children: [
-            .element(named: "p", children: [.text(symbol.roleHeading)]),
-        ])
+        // Title
         switch symbol.titleVariants.values(goal: goal) {
             case .single(let title):
-                hgroup.addChild(
-                    .element(named: "h1", children: renderer.wordBreak(symbolName: title))
+                hero.addChild(
+                    .element(.h1, children: renderer.wordBreak(symbolName: title))
                 )
             case .languageSpecific(let languageSpecificTitles):
                 for (language, languageSpecificTitle) in languageSpecificTitles.sorted(by: { $0.key < $1.key }) {
-                    hgroup.addChild(
-                        .element(named: "h1", children: renderer.wordBreak(symbolName: languageSpecificTitle), attributes: ["class": "\(language.id)-only"])
+                    hero.addChild(
+                        .element(.h1, children: renderer.wordBreak(symbolName: languageSpecificTitle), attributes: ["class": "\(language.id)-only"])
                     )
                 }
             case .empty:
                 // This shouldn't happen but because of a shortcoming in the API design of `DocumentationDataVariants`, it can't be guaranteed.
-                hgroup.addChild(
-                    .element(named: "h1", children: renderer.wordBreak(symbolName: symbol.title /* This is internally force unwrapped */))
+                hero.addChild(
+                    .element(.h1, children: renderer.wordBreak(symbolName: symbol.title /* This is internally force unwrapped */))
                 )
         }
-        hero.addChild(hgroup)
         
         // Abstract
         if let abstract = symbol.abstract {
-            hero.addChild(renderer.visit(abstract))
+            addAbstract(abstract, to: &hero)
         }
         
         // Availability
@@ -315,9 +310,11 @@ package struct HTMLRenderer {
         
         // TODO: Constraints
         
+        articleElement.addChild(hero)
+        
         // Deprecation message
         if let deprecationMessage = symbol.deprecatedSummary?.content {
-            addDeprecationSummary(markup: deprecationMessage, to: hero)
+            addDeprecationSummary(markup: deprecationMessage, to: &hero)
         }
         
         // Parameters
@@ -325,7 +322,7 @@ package struct HTMLRenderer {
             .values(goal: goal, by: { $0.parameters.elementsEqual($1.parameters, by: { $0.name == $1.name }) })
             .valuesByLanguage()
         {
-            separateSectionsIfNeeded(in: articleElement)
+            separateSectionsIfNeeded(in: &articleElement)
             
             articleElement.addChildren(renderer.parameters(
                 parameterSections.mapValues { section in
@@ -386,7 +383,7 @@ package struct HTMLRenderer {
             }
             
             if !taskGroupInfo.isEmpty {
-                separateSectionsIfNeeded(in: articleElement)
+                separateSectionsIfNeeded(in: &articleElement)
                 
                 articleElement.addChildren(renderer.groupedSection(named: "Topics", groups: [.swift: taskGroupInfo]))
             }
@@ -413,7 +410,7 @@ package struct HTMLRenderer {
         
         // See Also
         if let seeAlso = symbol.seeAlso {
-            addSeeAlso(seeAlso, to: articleElement)
+            addSeeAlso(seeAlso, to: &articleElement)
         }
         
         return RenderedPageInfo(
@@ -424,34 +421,47 @@ package struct HTMLRenderer {
             )
         )
     }
+   
+    private func addEyebrow(text: String, to element: inout HTMLElement) {
+        element.addChild(
+            .element(.p, children: [.text(text)], attributes: goal == .richness ? ["id": "eyebrow"] : [:])
+        )
+    }
     
-    private func addDeprecationSummary(markup: [any Markup], to element: XMLElement) {
-        var children: [XMLNode] = [
-            .element(named: "p", children: [.text("Deprecated")], attributes: ["class": "label"])
+    private func addAbstract(_ abstract: Paragraph, to element: inout HTMLElement) {
+        var paragraph = renderer.visit(abstract)
+        if goal == .richness {
+            paragraph.addAttributes(["id": "abstract"])
+        }
+        element.addChild(paragraph)
+    }
+    
+    private func addDeprecationSummary(markup: [any Markup], to element: inout HTMLElement) {
+        var children: [HTMLElement] = [
+            .element(.p, children: [.text("Deprecated")], attributes: ["class": "label"])
         ]
         for child in markup {
             children.append(renderer.visit(child))
         }
         
         element.addChild(
-            .element(named: "aside", children: children, attributes: ["class": "deprecated"])
+            .element(.aside, children: children, attributes: ["class": "aside deprecated"])
         )
     }
     
-    private func separateSectionsIfNeeded(in element: XMLElement) {
+    private func separateSectionsIfNeeded(in element: inout HTMLElement) {
         guard goal == .richness,
-              let previous = (element.children ?? []).last as? XMLElement,
-              previous.name == "section",
-              previous.attribute(forName: "id")?.stringValue != "hero" // Avoid adding a `<hr>` element between then hero (with background) and the next section
+              case .element(.section, let attributes, _) = element.storage,
+              attributes["id"] != "hero" // Avoid adding a `<hr>` element between then hero (with background) and the next section
         else {
             return
         }
         
-        element.addChild(.element(named: "hr")) // Separate the sections with a thematic break
+        element.addChild(.voidElement(.hr)) // Separate the sections with a thematic break
     }
     
-    private func addSeeAlso(_ seeAlso: SeeAlsoSection, to element: XMLElement) {
-        separateSectionsIfNeeded(in: element)
+    private func addSeeAlso(_ seeAlso: SeeAlsoSection, to element: inout HTMLElement) {
+        separateSectionsIfNeeded(in: &element)
         
         element.addChildren(
             renderer.groupedSection(named: "See Also", groups: [
@@ -480,8 +490,8 @@ private extension DocumentationDataVariantsTrait {
     }
 }
 
-private extension XMLElement {
-    func addChildren(_ nodes: [XMLNode]) {
+private extension HTMLElement {
+    mutating func addChildren(_ nodes: [HTMLElement]) {
         for node in nodes {
             addChild(node)
         }

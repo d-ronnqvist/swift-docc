@@ -8,13 +8,13 @@
  See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
-import struct Foundation.Data // Used as a return value by the formatter
+package import struct Foundation.Data // Used as a return value by the formatter
 
 // MARK: Element
 
 
 package struct HTMLElement {
-    enum Tag: UInt8 {
+    package enum Tag: UInt8 {
         case html
         
         // Metadata
@@ -142,7 +142,7 @@ package struct HTMLElement {
         case canvas
     }
     
-    enum VoidTag: UInt8 {
+    package enum VoidTag: UInt8 {
         // Metadata
         case base, link, meta
         // Grouping
@@ -157,13 +157,12 @@ package struct HTMLElement {
         case input
     }
     
-    fileprivate enum Storage {
+    /*fileprivate*/package enum Storage {
         case text(String)
-        case comment(String)
         case element(Tag, attributes: [String: String], children: [HTMLElement])
         case voidElement(VoidTag, attributes: [String: String])
     }
-    fileprivate var storage: Storage
+    /*fileprivate*/package var storage: Storage
     
     fileprivate var elementTag: Tag? {
         if case .element(let tag, _, _) = storage {
@@ -181,71 +180,60 @@ package struct HTMLElement {
         }
     }
     
-    /*fileprivate*/ static func text(_ text: consuming String) -> HTMLElement {
+    /*fileprivate*/ package static func text(_ text: consuming String) -> HTMLElement {
         .init(storage: .text(text))
-    }
-    fileprivate static func comment(_ comment: consuming String) -> HTMLElement {
-        .init(storage: .comment(comment))
     }
     /*fileprivate*/ static func element(_ tag: Tag, attributes: [String: String] = [:], @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
         .init(storage: .element(tag, attributes: attributes, children: children()))
     }
-    /*fileprivate*/ static func element(_ tag: Tag, attributes: [String: String] = [:], children: [HTMLElement]) -> HTMLElement {
+    /*fileprivate*/ package static func element(_ tag: Tag, attributes: [String: String] = [:], children: [HTMLElement]) -> HTMLElement {
         .init(storage: .element(tag, attributes: attributes, children: children))
     }
-    /*fileprivate*/ static func voidElement(_ tag: VoidTag, attributes: [String: String] = [:]) -> HTMLElement {
+    
+    /*fileprivate*/ package static func element(_ tag: Tag, children: [HTMLElement], attributes: [String: String]) -> HTMLElement {
+        .init(storage: .element(tag, attributes: attributes, children: children))
+    }
+    
+    /*fileprivate*/ package static func voidElement(_ tag: VoidTag, attributes: [String: String] = [:]) -> HTMLElement {
         .init(storage: .voidElement(tag, attributes: attributes))
     }
     
-    func render(into result: inout String) {
+    
+    package mutating func addChild(_ child: HTMLElement) {
+        if case .element(let tag, let attributes, var children) = storage {
+            children.append(child)
+            storage = .element(tag, attributes: attributes, children: children)
+        }
+    }
+    
+    package mutating func addAttributes(_ newAttributes: [String: String]) {
         switch storage {
-        case .text(let text):
-            result.append(contentsOf: text)
             
-        case .comment(let comment):
-            result.append(contentsOf: "<!-- \(comment) -->")
-            
-        case .element(let name, let attributes, let children):
-            result.append("<\(name)")
-            
-            for (name, value) in attributes.sorted(by: { $0.key < $1.key }) {
-                result.append(contentsOf: " \(name)=\"\(value)\"")
-            }
-            guard !children.isEmpty else {
-                result.append(contentsOf: "/>")
-                return
-            }
-            
-            result.append(">")
-            for child in children {
-                child.render(into: &result)
-            }
-            result.append(contentsOf: "</\(name)>")
-            
-        case .voidElement(let name, let attributes):
-            result.append("<\(name)")
-            
-            for (name, value) in attributes.sorted(by: { $0.key < $1.key }) {
-                result.append(contentsOf: " \(name)=\"\(value)\"")
-            }
-            result.append(">")
+            case .element(let tag, var attributes, let children):
+                attributes.merge(newAttributes, uniquingKeysWith: { _, new in new })
+                storage = .element(tag, attributes: attributes, children: children)
+            case .voidElement(let voidTag, var attributes):
+                attributes.merge(newAttributes, uniquingKeysWith: { _, new in new })
+                storage = .voidElement(voidTag, attributes: attributes)
+                
+            default: break
         }
     }
 }
 
 // MARK: Formatting
 
-struct HTMLFormatter {
+package struct HTMLFormatter {
     private var buffer: [UInt8]
     private let options: Options
     
-    private init(initialCapacity: Int = 512, options: Options) {
+    private init(initialCapacity: Int = 1024 * 2, options: Options) {
         self.buffer = [UInt8]()
         self.buffer.reserveCapacity(initialCapacity)
         self.options = options
     }
     
-    static func format(document: HTMLElement, options: Options = []) -> Data {
+    package static func format(document: HTMLElement, options: Options = []) -> Data {
         var encoder = Self(options: options)
         
         // When encoding an entire document,
@@ -259,7 +247,7 @@ struct HTMLFormatter {
         return Data(encoder.buffer)
     }
     
-    static func format(inPageElement: HTMLElement, options: Options = []) -> Data {
+    package static func format(inPageElement: HTMLElement, options: Options = []) -> Data {
         var encoder = Self(options: options)
         
         if case .element(.pre, _, _) = inPageElement.storage {
@@ -273,41 +261,43 @@ struct HTMLFormatter {
         return Data(encoder.buffer)
     }
     
-    struct Options: OptionSet {
-        let rawValue: Int
+    package struct Options: OptionSet {
+        package let rawValue: Int
+        package init(rawValue: Int) {
+            self.rawValue = rawValue
+        }
         
         ///
-        static let prettyPrint = Self(rawValue: 1 << 0)
+        package static let prettyPrint = Self(rawValue: 1 << 0)
         
         ///
-        static let includeComments = Self(rawValue: 1 << 1)
+        package static let omitQuotingSingleWordAttributeValues = Self(rawValue: 1 << 1)
         
         ///
-        static let omitQuotingSingleWordAttributeValues = Self(rawValue: 1 << 2)
-        
-        ///
-        static let omitAllowedEndTags = Self(rawValue: 1 << 3)
+        package static let omitAllowedEndTags = Self(rawValue: 1 << 2)
     }
     
     // MARK: Compact formatting
     
-    private mutating func _compactFormat(_ element: HTMLElement, nextElementTag: HTMLElement.Tag?) {
+    private mutating func _compactFormat(_ element: consuming HTMLElement, nextElementTag: HTMLElement.Tag?) {
         switch element.storage {
         case .text(let text):
-            _format(text: text)
+            _format(text: consume text)
             
-        case .comment(let comment):
-            guard options.contains(.includeComments) else { return }
-            _format(comment: comment)
+//        case .comment(_):
+//            fatalError()
+//            guard options.contains(.includeComments) else { return }
+//            _format(comment: comment)
             
         case .element(let tag, let attributes, let children):
             buffer.append(.init(ascii: "<"))
             tag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
             
             // Start tag
-            _format(attributes: attributes)
+            _format(attributes: consume attributes)
             guard !children.isEmpty else {
-                buffer.append(contentsOf: "/>".utf8)
+//                buffer.append(contentsOf: "/>".utf8)
+                _add_s("/>")
                 return
             }
             buffer.append(.init(ascii: ">"))
@@ -323,15 +313,17 @@ struct HTMLFormatter {
             if options.contains(.omitAllowedEndTags), tag.canOmitEndTag(whenFollowedBy: nextElementTag) {
                 return
             }
-            buffer.append(contentsOf: "</".utf8)
-            tag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
+//            buffer.append(contentsOf: "</".utf8)
+            _add_s("</")
+//            tag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
+            _add_s(tag.name)
             buffer.append(.init(ascii: ">"))
             
             
         case .voidElement(let voidTag, let attributes):
             buffer.append(.init(ascii: "<"))
             voidTag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
-            _format(attributes: attributes)
+            _format(attributes: consume attributes)
             buffer.append(.init(ascii: ">"))
         }
     }
@@ -352,138 +344,215 @@ struct HTMLFormatter {
     }
     
     private mutating func _prettyFormat(_ element: HTMLElement, state: PrettyPrintingState) {
-        func addNewLineIndentation(depth: UInt8 = state.depth) {
-            Self._indentationData.withUnsafeBufferPointer {
-                buffer.append(contentsOf: $0.prefix(1 /* the newline */ &+ Int(depth) &* 2 /* two spaces per indentation level */))
-            }
-        }
-        
-        switch element.storage {
-        case .text(let text):
-            if !state.presentOnSameLine {
-                addNewLineIndentation()
-            }
-            _format(text: text)
+//        let whitespaceLength = 1 /* the newline */ &+ Int(state.depth) &* 2
+//        withUnsafeTemporaryAllocation(of: UInt8.self, capacity: whitespaceLength) { indentationBuffer in
+//            indentationBuffer.initialize(repeating: .init(ascii: " "))
+//            indentationBuffer[0] = .init(ascii: "\n")
+//            defer {
+//                indentationBuffer.deinitialize()
+//            }
             
-        case .comment(let comment):
-            guard options.contains(.includeComments) else { return }
-            if !state.presentOnSameLine {
-                addNewLineIndentation()
-            }
-            _format(comment: comment)
-            
-        case .element(let tag, let attributes, let children):
-            if !state.presentOnSameLine {
-                addNewLineIndentation()
-            }
-            // Add the start tag
-            buffer.append(.init(ascii: "<"))
-            tag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
-            
-            _format(attributes: attributes)
-            guard !children.isEmpty else {
-                // Self-close the element if it's empty.
-                buffer.append(contentsOf: "/>".utf8)
-                return
-            }
-            buffer.append(.init(ascii: ">"))
-            
-            
-            // It's a matter of opinion how to "pretty print" HTML.
-            let presentChildrenOnSameLine = attributes.isEmpty && !children.contains(where: \.isElement)
-            var childState = PrettyPrintingState(depth: state.depth &+ 1, presentOnSameLine: presentChildrenOnSameLine, nextElement: nil)
-            
-            for index in children.indices {
-                let child = children[index]
-                let nextIndex = index &+ 1
-                // It's necessary to know what element comes next in the container (if any) to determine when it's allowed to omit the end tag.
-                childState.nextElement = nextIndex < children.endIndex ? children[nextIndex].elementTag : nil
-               
-                // Whitespace is significant inside `<pre>` elements; so we switch to formatting that sub-hierarchy _without_ pretty printing.
-                if child.elementTag == .pre {
-                    // However, first we add a new line and indentation so that the `<pre>` element starts appropriately indented on a new line.
-                    addNewLineIndentation(depth: childState.depth)
-                    _compactFormat(child, nextElementTag: childState.nextElement)
-                } else {
-                    _prettyFormat(child, state: childState)
+            func addNewLineIndentation(depth: UInt8 = state.depth) {
+//                buffer.append(contentsOf: indentationBuffer)
+                Self._indentationData.withUnsafeBufferPointer {
+                    buffer.append(contentsOf: $0.prefix(1 /* the newline */ &+ Int(depth) &* 2 /* two spaces per indentation level */))
                 }
             }
             
-            // End tag
-            if options.contains(.omitAllowedEndTags), tag.canOmitEndTag(whenFollowedBy: state.nextElement) {
-                return
+            switch element.storage {
+            case .text(let text):
+                if !state.presentOnSameLine {
+                    addNewLineIndentation()
+                }
+                _format(text: consume text)
+                
+                //        case .comment(_):
+                //            fatalError()
+                //            guard options.contains(.includeComments) else { return }
+                //            if !state.presentOnSameLine {
+                //                addNewLineIndentation()
+                //            }
+                //            _format(comment: comment)
+                
+            case .element(let tag, let attributes, let children):
+                if !state.presentOnSameLine {
+                    addNewLineIndentation()
+                }
+                // Add the start tag
+                buffer.append(.init(ascii: "<"))
+                tag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
+                
+                let presentChildrenOnSameLine = attributes.isEmpty && !children.contains(where: \.isElement)
+                _format(attributes: consume attributes)
+                guard !children.isEmpty else {
+                    // Self-close the element if it's empty.
+                    //                buffer.append(contentsOf: "/>".utf8)
+                    _add_s("/>")
+                    return
+                }
+                buffer.append(.init(ascii: ">"))
+                
+                
+                // It's a matter of opinion how to "pretty print" HTML.
+                //            let presentChildrenOnSameLine = attributes.isEmpty && !children.contains(where: \.isElement)
+                var childState = PrettyPrintingState(depth: state.depth &+ 1, presentOnSameLine: presentChildrenOnSameLine, nextElement: nil)
+                
+                for index in children.indices {
+                    let child = children[index]
+                    let nextIndex = index &+ 1
+                    // It's necessary to know what element comes next in the container (if any) to determine when it's allowed to omit the end tag.
+                    childState.nextElement = nextIndex < children.endIndex ? children[nextIndex].elementTag : nil
+                    
+                    // Whitespace is significant inside `<pre>` elements; so we switch to formatting that sub-hierarchy _without_ pretty printing.
+                    if child.elementTag == .pre {
+                        // However, first we add a new line and indentation so that the `<pre>` element starts appropriately indented on a new line.
+                        addNewLineIndentation(depth: childState.depth)
+                        _compactFormat(child, nextElementTag: childState.nextElement)
+                    } else {
+                        _prettyFormat(child, state: childState)
+                    }
+                }
+                
+                // End tag
+                if options.contains(.omitAllowedEndTags), tag.canOmitEndTag(whenFollowedBy: state.nextElement) {
+                    return
+                }
+                if !presentChildrenOnSameLine {
+                    addNewLineIndentation()
+                }
+                //            buffer.append(contentsOf: "</".utf8)
+                _add_s("</")
+                tag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
+                buffer.append(.init(ascii: ">"))
+                
+                
+            case .voidElement(let voidTag, let attributes):
+                if !state.presentOnSameLine {
+                    addNewLineIndentation()
+                }
+                buffer.append(.init(ascii: "<"))
+                voidTag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
+                _format(attributes: consume attributes)
+                buffer.append(.init(ascii: ">"))
             }
-            if !presentChildrenOnSameLine {
-                addNewLineIndentation()
-            }
-            buffer.append(contentsOf: "</".utf8)
-            tag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
-            buffer.append(.init(ascii: ">"))
-            
-            
-        case .voidElement(let voidTag, let attributes):
-            if !state.presentOnSameLine {
-                addNewLineIndentation()
-            }
-            buffer.append(.init(ascii: "<"))
-            voidTag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
-            _format(attributes: attributes)
-            buffer.append(.init(ascii: ">"))
+//        }
+    }
+    
+    private mutating func _add(_ string: consuming String) {
+        var string = consume string
+        string.withUTF8 {
+            buffer.append(contentsOf: $0)
         }
     }
     
-    private mutating func _format(text: String) {
-        var remaining = text.utf8[...]
-        
-        while let index = remaining.firstIndex(where: \.needsEscapingInHTMLText) {
-            buffer.append(contentsOf: remaining[..<index])
-            switch remaining[index] {
-                case .init(ascii: "&"): buffer.append(contentsOf: "&amp;".utf8)
-                case .init(ascii: "<"): buffer.append(contentsOf: "&lt;".utf8)
-                case .init(ascii: ">"): buffer.append(contentsOf: "&gt;".utf8)
+    private mutating func _add_s(_ string: StaticString) {
+        string.withUTF8Buffer { buffer.append(contentsOf: $0) }
+    }
+    
+    private mutating func _format(text: consuming String) {
+        var text = consume text
+//        text.utf8Span.withUnsafeBytes {
+        text.withUTF8 {
+            var remaining = $0[...]
+            
+//            buffer.append(addingCapacity: pointer.count * 4) { span in
+//                func _add_s(_ string: StaticString) {
+//                    string.withUTF8Buffer {
+//                        for c in $0 {
+//                            span.append(c)
+//                        }
+//                    }
+//                }
+//                
+//                for char in pointer {
+//                    switch char {
+//                    case .init(ascii: "&"): _add_s("&amp;") //buffer.append(contentsOf: "&amp;".utf8)
+//                    case .init(ascii: "<"): _add_s("&lt;") //buffer.append(contentsOf: "&lt;".utf8)
+//                    case .init(ascii: ">"): _add_s("&gt;") //buffer.append(contentsOf: "&gt;".utf8)
+//                    default: span.append(char)
+//                    }
+//                }
+//                
+//            }
+            
+            
+            while let index = remaining.firstIndex(where: \.needsEscapingInHTMLText) {
+                buffer.append(contentsOf: remaining[..<index])
+                switch remaining[index] {
+                case .init(ascii: "&"): _add_s("&amp;") //buffer.append(contentsOf: "&amp;".utf8)
+                case .init(ascii: "<"): _add_s("&lt;") //buffer.append(contentsOf: "&lt;".utf8)
+                case .init(ascii: ">"): _add_s("&gt;") //buffer.append(contentsOf: "&gt;".utf8)
                 default: fatalError("Missing handling of escapable character '\(Character(UnicodeScalar(remaining[index])))'")
+                }
+                remaining = remaining[remaining.index(after: index)...]
             }
-            remaining = remaining[remaining.index(after: index)...]
+            
+            buffer.append(contentsOf: remaining)
+                
         }
         
-        buffer.append(contentsOf: remaining)
+//        var remaining = text.utf8[...]
+//        
+//        while let index = remaining.firstIndex(where: \.needsEscapingInHTMLText) {
+//            buffer.append(contentsOf: remaining[..<index])
+//            switch remaining[index] {
+//                case .init(ascii: "&"): _add("&amp;") //buffer.append(contentsOf: "&amp;".utf8)
+//                case .init(ascii: "<"): _add("&lt;") //buffer.append(contentsOf: "&lt;".utf8)
+//                case .init(ascii: ">"): _add("&gt;") //buffer.append(contentsOf: "&gt;".utf8)
+//                default: fatalError("Missing handling of escapable character '\(Character(UnicodeScalar(remaining[index])))'")
+//            }
+//            remaining = remaining[remaining.index(after: index)...]
+//        }
+//        
+//        buffer.append(contentsOf: remaining)
     }
     
     private mutating func _format(attributes: [String: String]) {
-        func _format(value: String) {
-            var remaining = value.utf8[...]
-            
-            // If the formatter is configured to not quote attribute values unless necessary; check the value _needs_ quoting.
-            guard !options.contains(.omitQuotingSingleWordAttributeValues) || remaining.contains(where: \.needsQuotingInHTMLAttribute) else {
-                buffer.append(.init(ascii: "="))
-                // If the value doesn't need quoting, the only escapable character is `&`.
-                while let index = remaining.firstIndex(of: .init(ascii: "&")) {
+        func _format(value: consuming String) {
+            var value = consume value
+            value.withUTF8 {
+                var remaining = $0[...]
+                
+                // If the formatter is configured to not quote attribute values unless necessary; check the value _needs_ quoting.
+                guard !options.contains(.omitQuotingSingleWordAttributeValues) || remaining.contains(where: \.needsQuotingInHTMLAttribute) else {
+                    buffer.append(.init(ascii: "="))
+                    // If the value doesn't need quoting, the only escapable character is `&`.
+                    while let index = remaining.firstIndex(of: .init(ascii: "&")) {
+                        buffer.append(contentsOf: remaining[..<index])
+                        //                    buffer.append(contentsOf: "&amp;".utf8)
+                        _add_s("&amp;")
+                        remaining = remaining[remaining.index(after: index)...]
+                    }
+                    buffer.append(contentsOf: remaining)
+                    return
+                }
+                
+//                buffer.append(contentsOf: "=\"".utf8)
+                _add_s("=\"")
+                
+                while let index = remaining.firstIndex(where: \.needsEscapingInHTMLAttribute) {
                     buffer.append(contentsOf: remaining[..<index])
-                    buffer.append(contentsOf: "&amp;".utf8)
+                    // Because the formatter uses `"` to quote the attribute values; we only need to escape `&` and `"`.
+                    //                buffer.append(contentsOf: remaining[index] == .init(ascii: "&") ? "&amp;".utf8 : "&quot;".utf8)
+                    if remaining[index] == .init(ascii: "&") {
+                        _add_s("&amp;")
+                    } else {
+                        _add_s("&quot;")
+                    }
                     remaining = remaining[remaining.index(after: index)...]
                 }
                 buffer.append(contentsOf: remaining)
-                return
+                buffer.append(.init(ascii: "\""))
             }
-            
-            buffer.append(contentsOf: "=\"".utf8)
-            
-            while let index = remaining.firstIndex(where: \.needsEscapingInHTMLAttribute) {
-                buffer.append(contentsOf: remaining[..<index])
-                // Because the formatter uses `"` to quote the attribute values; we only need to escape `&` and `"`.
-                buffer.append(contentsOf: remaining[index] == .init(ascii: "&") ? "&amp;".utf8 : "&quot;".utf8)
-                remaining = remaining[remaining.index(after: index)...]
-            }
-            buffer.append(contentsOf: remaining)
-            buffer.append(.init(ascii: "\""))
         }
         
         // Regardless of pretty printing or not, sort the attributes by their key so that the output is stable across different program executions.
         for (name, value) in attributes.sorted(by: { $0.key < $1.key }) {
             buffer.append(.init(ascii: " "))
-            buffer.append(contentsOf: name.utf8)
+//            buffer.append(contentsOf: name.utf8)
+            _add(consume name)
             guard !value.isEmpty else { continue }
-            _format(value: value)
+            _format(value: consume value)
         }
     }
     
@@ -524,30 +593,66 @@ private extension UInt8 {
 @resultBuilder
 struct HTMLBuilder {
     
-    typealias Something = [HTMLElement]
+//    typealias Something = [HTMLElement]
     
-    static func buildBlock(_ components: [HTMLElement]...) -> Something {
-        components.flatMap { $0 }
-    }
+//    static func buildBlock(_ components: [HTMLElement]...) -> Something {
+//        components.flatMap { $0 }
+//    }
     
-    static func buildExpression(_ expression: consuming HTMLElement) -> Something {
-        [expression]
-    }
+//    static func buildExpression(_ expression: consuming HTMLElement) -> Something {
+//        [expression]
+//    }
     
-    static func buildExpression(_ text: consuming String) -> Something {
-        [.text(text)]
-    }
+//    static func buildExpression(_ text: consuming String) -> Something {
+//        [.text(text)]
+//    }
     
     /// Support `if` statements without an `else` statement.
-    static func buildOptional(_ component: consuming Something?) -> Something { component ?? [] }
+//    static func buildOptional(_ component: consuming Something?) -> Something { component ?? [] }
+//    
+//    /// Support `if-else` and `switch` statements.
+//    static func buildEither(first  component: consuming Something) -> Something { component }
+//    static func buildEither(second component: consuming Something) -> Something { component }
+//    
+//    /// Support `for-in` loops
+//    static func buildArray(_ components: consuming [Something]) -> Something {
+//        components.flatMap { $0 }
+//    }
     
-    /// Support `if-else` and `switch` statements.
-    static func buildEither(first  component: consuming Something) -> Something { component }
-    static func buildEither(second component: consuming Something) -> Something { component }
+//    static func buildArray(_ components: [ [HTMLElement] ]) -> [HTMLElement] {
+//        components.flatMap { $0 }
+//    }
     
-    /// Support `for-in` loops
-    static func buildArray(_ components: consuming [Something]) -> Something {
-        components.flatMap { $0 }
+    static func buildPartialBlock(first: HTMLElement) -> [HTMLElement] {
+        [first]
+    }
+    
+//    static func buildPartialBlock(first: [HTMLElement]) -> [HTMLElement] {
+//        first
+//    }
+    
+    static func buildPartialBlock(accumulated: consuming [HTMLElement], next: HTMLElement) -> [HTMLElement] {
+        var copy = consume accumulated
+        copy.append(next)
+        return copy
+    }
+    
+//    static func buildPartialBlock(accumulated: consuming [HTMLElement], next: consuming [HTMLElement]) -> [HTMLElement] {
+//        var copy = consume accumulated
+//        copy.append(contentsOf: next)
+//        return copy
+//    }
+//    
+//    static func buildPartialBlock(accumulated: consuming [HTMLElement], next: consuming [ [HTMLElement] ]) -> [HTMLElement] {
+//        var copy = consume accumulated
+//        for n in next {
+//            copy.append(contentsOf: n)
+//        }
+//        return copy
+//    }
+    
+    static func buildFinalResult(_ component: [HTMLElement]) -> [HTMLElement] {
+        component
     }
 }
 

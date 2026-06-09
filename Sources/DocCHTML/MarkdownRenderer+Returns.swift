@@ -25,23 +25,23 @@ package extension MarkdownRenderer {
     ///
     /// If all language representations of the symbol have the _same_ return value, only pass the return value content for one language.
     /// This produces a "returns" section that doesn't hide the return value content for any of the languages (same as if the symbol only had one language representation)
-    func returns(_ languageSpecificSections: [SourceLanguage: [any Markup]]) -> [XMLNode] {
+    func returns(_ languageSpecificSections: [SourceLanguage: [any Markup]]) -> [HTMLElement] {
         let info = RenderHelpers.sortedLanguageSpecificValues(languageSpecificSections)
-        let items: [XMLNode] = if info.count == 1 {
+        let items: [HTMLElement] = if info.count == 1 {
             info.first!.value.map { visit($0) }
         } else {
             info.flatMap { language, content in
-                let attributes = ["class": "\(language.id)-only"]
+                let newAttributes = ["class": "\(language.id)-only"]
                 // Most return sections only have 1 paragraph of content with 2 and 3 paragraphs being increasingly uncommon.
                 // Avoid wrapping that content in a `<div>` or other container element and instead add the language specific class attribute to each paragraph.
                 return content.map { markup in
                     let node = visit(markup)
-                    if let element = node as? XMLElement {
-                        element.addAttributes(attributes)
-                        return element
+                    if case .element(let tag, var attributes, let children) = node.storage {
+//                        attributes.merge
+                        return HTMLElement.element(tag, children: children, attributes: attributes)
                     } else {
                         // Any text _should_ already be contained in a markdown paragraph, but if the input is unexpected, wrap the raw text in a paragraph here.
-                        return .element(named: "p", children: [node], attributes: attributes)
+                        return .element(.p, children: [node], attributes: newAttributes)
                     }
                 }
             }

@@ -38,14 +38,14 @@ package extension MarkdownRenderer {
     ///
     /// If all language representations of the symbol have the _same_ parameters, only pass the parameter information for one language.
     /// This produces a "parameters" section that doesn't hide any parameters for any of the languages (same as if the symbol only had one language representation)
-    func parameters(_ info: [SourceLanguage: [ParameterInfo]]) -> [XMLNode] {
+    func parameters(_ info: [SourceLanguage: [ParameterInfo]]) -> [HTMLElement] {
         let info = RenderHelpers.sortedLanguageSpecificValues(info)
         guard info.contains(where: { _, parameters in !parameters.isEmpty }) else {
             // Don't create a section if there are no parameters to describe.
             return []
         }
         
-        let items: [XMLElement] = switch info.count {
+        let items: [HTMLElement] = switch info.count {
         case 1:
             [_singleLanguageParameters(info.first!.value)]
             
@@ -57,7 +57,7 @@ package extension MarkdownRenderer {
             // produce correct looking pages that may include duplicated markup by not trying to share parameters across languages.
             info.map { language, info in
                 .element(
-                    named: "dl",
+                    .dl,
                     children: _singleLanguageParameterItems(info),
                     attributes: ["class": "\(language.id)-only"]
                 )
@@ -67,22 +67,22 @@ package extension MarkdownRenderer {
         return selfReferencingSection(named: "Parameters", content: items)
     }
     
-    private func _singleLanguageParameters(_ parameterInfo: [ParameterInfo]) -> XMLElement {
-        .element(named: "dl", children: _singleLanguageParameterItems(parameterInfo))
+    private func _singleLanguageParameters(_ parameterInfo: [ParameterInfo]) -> HTMLElement {
+        .element(.dl, children: _singleLanguageParameterItems(parameterInfo))
     }
     
-    private func _singleLanguageParameterItems(_ parameterInfo: [ParameterInfo]) -> [XMLElement] {
+    private func _singleLanguageParameterItems(_ parameterInfo: [ParameterInfo]) -> [HTMLElement] {
         // When there's only a single language representation, create a list of `<dt>` and `<dd>` HTML elements ("terms" and "definitions" in a "description list" (`<dl> HTML element`)
-        var items: [XMLElement] = []
+        var items: [HTMLElement] = []
         items.reserveCapacity(parameterInfo.count * 2)
         for parameter in parameterInfo {
             // name
             items.append(
-                .element(named: "dt", children: [.text(parameter.name)])
+                .element(.dt, children: [.text(parameter.name)])
             )
             // description
             items.append(
-                .element(named: "dd", children: parameter.content.map { visit($0) })
+                .element(.dd, children: parameter.content.map { visit($0) })
             )
         }
         
@@ -92,7 +92,7 @@ package extension MarkdownRenderer {
     private func _dualLanguageParameters(
         primary:   (key: SourceLanguage, value: [ParameterInfo]),
         secondary: (key: SourceLanguage, value: [ParameterInfo])
-    ) -> XMLElement {
+    ) -> HTMLElement {
         // "Shadow" the parameters with more descriptive tuple labels
         let primary   = (language: primary.key,   parameters: primary.value)
         let secondary = (language: secondary.key, parameters: secondary.value)
@@ -129,12 +129,12 @@ package extension MarkdownRenderer {
             let index = (offset + primaryOnlyIndices.count(where: { $0 < offset })) * 2
             items.insert(contentsOf: [
                 // Name
-                .element(named: "dt", children: [.text(parameter.name)], attributes: ["class": "\(secondary.language.id)-only"]),
+                .element(.dt, children: [.text(parameter.name)], attributes: ["class": "\(secondary.language.id)-only"]),
                 // Description
-                .element(named: "dd", children: parameter.content.map { visit($0) }, attributes: ["class": "\(secondary.language.id)-only"])
+                .element(.dd, children: parameter.content.map { visit($0) }, attributes: ["class": "\(secondary.language.id)-only"])
             ], at: index)
         }
         
-        return .element(named: "dl", children: items)
+        return .element(.dl, children: items)
     }
 }

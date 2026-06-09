@@ -26,8 +26,8 @@ enum RenderHelpers {
     ///       △          ▲         ▲    △      ▲   △
     ///       │          ╰─────────┴───╴│╶─────┴──╴│╶─── after syntax
     ///       ╰─────────────────────────┴──────────┴──── between words
-    static func wordBreak(symbolName: String) -> [XMLNode] {
-        var result: [XMLNode] = []
+    static func wordBreak(symbolName: String) -> [HTMLElement] {
+        var result: [HTMLElement] = []
         
         let utf8View = symbolName.utf8
         let indices = utf8View.indices
@@ -45,7 +45,7 @@ enum RenderHelpers {
             
             result.append(.text(String(utf8View[fromIndex ..< index])!))
             if index < utf8View.endIndex {
-                result.append(.element(named: "wbr"))
+                result.append(.voidElement(.wbr))
             }
             fromIndex = index
         }

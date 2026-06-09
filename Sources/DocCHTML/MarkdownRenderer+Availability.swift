@@ -36,8 +36,8 @@ package extension MarkdownRenderer {
     }
     
     /// Creates an HTML element that describes the versions that a piece of API is available for the platforms described in the given availability information.
-    func availability(_ info: [AvailabilityInfo]) -> XMLNode {
-        let items: [XMLNode] = info.map {
+    func availability(_ info: [AvailabilityInfo]) -> HTMLElement {
+        let items: [HTMLElement] = info.map {
             var text = $0.name
             
             let description: String
@@ -63,13 +63,13 @@ package extension MarkdownRenderer {
                 attributes["class"] = "deprecated"
             }
             
-            return .element(named: "li", children: [.text(text)], attributes: goal == .richness ? attributes : [:])
+            return .element(.li, children: [.text(text)], attributes: goal == .richness ? attributes : [:])
         }
         
         return .element(
-            named: "ul",
-            children: items,
-            attributes: ["id": "availability"]
+            .ul,
+            attributes: ["id": "availability"],
+            children: items
         )
     }
 }

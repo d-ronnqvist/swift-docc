@@ -17,7 +17,7 @@ import Foundation
 #endif
 
 import SwiftDocC
-private import DocCHTML
+import DocCHTML
 
 struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
     var prettyPrintOutput: Bool
@@ -80,17 +80,17 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
         }
         
         func makeContent(
-            content: XMLNode,
+            content: HTMLElement,
             title: String,
             plainDescription: String?,
             prettyPrint: Bool
         ) -> String {
             var copy = original
             // Replace the content in reverse order so that the earlier ranges remain valid.
-            copy.replaceSubrange(contentReplacementRange, with: content.rendered(prettyPrinted: prettyPrint))
+            copy.replaceSubrange(contentReplacementRange, with: String(decoding: HTMLFormatter.format(inPageElement: content, options: [.omitAllowedEndTags, .omitQuotingSingleWordAttributeValues]), as: UTF8.self))
             if let plainDescription {
-                let metaDescription = XMLNode.element(named: "meta", attributes: ["name": "description", "content": plainDescription])
-                copy.replaceSubrange(descriptionReplacementRange, with: metaDescription.rendered(prettyPrinted: prettyPrint))
+                let metaDescription = HTMLElement.voidElement(.meta, attributes: ["name": "description", "content": plainDescription])
+                copy.replaceSubrange(descriptionReplacementRange, with: String(decoding: HTMLFormatter.format(inPageElement: metaDescription, options: .omitQuotingSingleWordAttributeValues), as: UTF8.self))
             }
             copy.replaceSubrange(titleReplacementRange,   with: title)
             
@@ -135,7 +135,7 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
     }
     
     func consume(
-        mainContent: XMLNode,
+        mainContent: HTMLElement,
         metadata: (title: String, description: String?),
         forPage reference: ResolvedTopicReference
     ) throws {
@@ -148,15 +148,5 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
         
         let relativeFilePath = NodeURLGenerator.fileSafeReferencePath(reference, lowercased: true) + "/index.html"
         try fileWriter.write(Data(htmlString.utf8), toFileSafePath: relativeFilePath)
-    }
-}
-
-private extension XMLNode {
-    func rendered(prettyPrinted: Bool) -> String {
-        if prettyPrinted {
-            xmlString(options: [.nodePrettyPrint, .nodeCompactEmptyElement])
-        } else {
-            xmlString(options: .nodeCompactEmptyElement)
-        }
     }
 }

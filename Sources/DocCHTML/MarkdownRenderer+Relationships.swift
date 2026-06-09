@@ -38,69 +38,77 @@ package extension MarkdownRenderer {
     ///
     /// If the API has the _same_ lists in all language representations, only pass the lists for one language.
     /// This produces a named section that doesn't hide any lists for any of the languages (the same as if the symbol only had one language representation).
-    func groupedListSection(named sectionName: String, groups lists: [SourceLanguage: [ListInfo]]) -> [XMLNode] {
+    func groupedListSection(named sectionName: String, groups lists: [SourceLanguage: [ListInfo]]) -> [HTMLElement] {
         let lists = RenderHelpers.sortedLanguageSpecificValues(lists)
         
-        let items: [XMLElement] = if lists.count == 1 {
+        let items: [HTMLElement] = if lists.count == 1 {
             lists.first!.value.flatMap { list in
                 _singleListGroupElements(for: list)
             }
         } else {
             // TODO: As a future improvement we could diff the references and only mark them as language-specific if the group and reference doesn't appear in all languages.
             lists.flatMap { language, taskGroups in
-                let attribute = XMLNode.attribute(withName: "class", stringValue: "\(language.id)-only") as! XMLNode
+//                let attribute = HTMLElement.attribute(withName: "class", stringValue: "\(language.id)-only") as! HTMLElement
                 
                 let elements = taskGroups.flatMap { _singleListGroupElements(for: $0) }
-                for element in elements {
-                    element.addAttribute(attribute)
+//                for element in elements {
+//                    element.addAttribute(attribute)
+//                }
+                return elements.map {
+                    switch $0.storage {
+                        case .element(let tag, var attributes, let children):
+                            attributes["class"] = "\(language.id)-only"
+                            return HTMLElement.element(tag, attributes: attributes, children: children)
+                            
+                        default: return $0
+                    }
                 }
-                return elements
             }
         }
         
         return selfReferencingSection(named: sectionName, content: items)
     }
     
-    private func _singleListGroupElements(for list: ListInfo) -> [XMLElement] {
+    private func _singleListGroupElements(for list: ListInfo) -> [HTMLElement] {
         let listItems = list.references.compactMap { reference in
             linkProvider.element(for: reference).map { _listItem(for: $0) }
         }
         // Don't return a title or abstract/discussion if this group has no links to display.
         guard !listItems.isEmpty else { return [] }
         
-        var items: [XMLElement] = []
+        var items: [HTMLElement] = []
         // Title
         if let title = list.title {
             items.append(selfReferencingHeading(level: 3, content: [.text(title)], plainTextTitle: title))
         }
         // Links
-        items.append(.element(named: "ul", children: listItems))
+        items.append(.element(.ul, children: listItems))
         
         return items
     }
     
-    private func _listItem(for element: LinkedElement) -> XMLElement {
-        var items: [XMLNode]
+    private func _listItem(for element: LinkedElement) -> HTMLElement {
+        var items: [HTMLElement]
         switch element.names {
         case .single(.conceptual(let title)):
             items = [.text(title)]
             
         case .single(.symbol(let title)):
-            items = [ .element(named: "code", children: wordBreak(symbolName: title)) ]
+            items = [ .element(.code, children: wordBreak(symbolName: title)) ]
             
         case .languageSpecificSymbol(let titlesByLanguage):
             let titlesByLanguage = RenderHelpers.sortedLanguageSpecificValues(titlesByLanguage)
             items = if titlesByLanguage.count == 1 {
-                [ .element(named: "code", children: wordBreak(symbolName: titlesByLanguage.first!.value)) ]
+                [ .element(.code, children: wordBreak(symbolName: titlesByLanguage.first!.value)) ]
             } else {
                 titlesByLanguage.map { language, title in
-                    .element(named: "code", children: wordBreak(symbolName: title), attributes: ["class": "\(language.id)-only"])
+                    .element(.code, children: wordBreak(symbolName: title), attributes: ["class": "\(language.id)-only"])
                 }
             }
         }
         
-        return .element(named: "li", children: [
-            .element(named: "a", children: items, attributes: ["href": path(to: element.path)])
+        return .element(.li, children: [
+            .element(.a, children: items, attributes: ["href": path(to: element.path)])
         ])
     }
 }

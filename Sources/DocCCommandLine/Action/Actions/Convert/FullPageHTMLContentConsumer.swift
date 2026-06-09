@@ -17,7 +17,7 @@ import Foundation
 #endif
 
 import SwiftDocC
-private import DocCHTML
+import DocCHTML
 
 // I'm not convinced that this is the best long-term design for HTML as a primary output format.
 // It currently exist because the consumers are created in the DocCCommandLine target but the core logic is in SwiftDocC.
@@ -46,14 +46,14 @@ struct FullPageHTMLContentConsumer: HTMLContentConsumer {
     }
     
     func consume(
-        mainContent: XMLNode,
+        mainContent: HTMLElement,
         metadata: (title: String, description: String?),
         forPage reference: ResolvedTopicReference
     ) throws {
         let page = HTMLRenderer.makeFullPage(mainContent: mainContent, metadata: metadata, for: reference, customHeader: customHeader, customFooter: customFooter)
         
-        let htmlString = page.xmlString(options: .nodeCompactEmptyElement)
+        let htmlData = DocCHTML.HTMLFormatter.format(document: page, options: [.omitQuotingSingleWordAttributeValues, .prettyPrint])
         let relativeFilePath = NodeURLGenerator.fileSafeReferencePath(reference, lowercased: true) + "/index.html"
-        try fileWriter.write(Data(htmlString.utf8), toFileSafePath: relativeFilePath)
+        try fileWriter.write(htmlData, toFileSafePath: relativeFilePath)
     }
 }

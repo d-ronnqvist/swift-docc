@@ -15,6 +15,8 @@ package import FoundationXML
 package import Foundation
 #endif
 
+package import DocCHTML
+
 /// A consumer for HTML content produced during documentation conversion.
 package protocol HTMLContentConsumer {
     // One reason that this is its own protocol, rather than an extension of ConvertOutputConsumer, is so that we can avoid exposing `XMLNode` in any public API.
@@ -30,7 +32,7 @@ package protocol HTMLContentConsumer {
     ///   - metadata: Metadata information (title and description) about this page.
     ///   - reference: The resolved topic reference that identifies this page.
     func consume(
-        mainContent: XMLNode,
+        mainContent: HTMLElement,
         metadata: (
             title: String,
             description: String?

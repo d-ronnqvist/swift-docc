@@ -42,21 +42,21 @@ package extension MarkdownRenderer {
     ///
     /// If the API has the _same_ task groups in all language representations, only pass the task groups for one language.
     /// This produces a named section that doesn't hide any task groups for any of the languages (the same as if the symbol only had one language representation).
-    func groupedSection(named sectionName: String, groups taskGroups: [SourceLanguage: [TaskGroupInfo]]) -> [XMLNode] {
+    func groupedSection(named sectionName: String, groups taskGroups: [SourceLanguage: [TaskGroupInfo]]) -> [HTMLElement] {
         let taskGroups = RenderHelpers.sortedLanguageSpecificValues(taskGroups)
         
-        let items: [XMLElement] = if taskGroups.count == 1 {
+        let items: [HTMLElement] = if taskGroups.count == 1 {
             taskGroups.first!.value.flatMap { taskGroup in
                 _singleTaskGroupElements(for: taskGroup)
             }
         } else {
             // TODO: As a future improvement we could diff the references and only mark them as language-specific if the group and reference doesn't appear in all languages.
             taskGroups.flatMap { language, taskGroups in
-                let attribute = XMLNode.attribute(withName: "class", stringValue: "\(language.id)-only") as! XMLNode
+                let attribute = ["class": "\(language.id)-only"]
                 
-                let elements = taskGroups.flatMap { _singleTaskGroupElements(for: $0) }
-                for element in elements {
-                    element.addAttribute(attribute)
+                var elements = taskGroups.flatMap { _singleTaskGroupElements(for: $0) }
+                for index in elements.indices {
+                    elements[index].addAttributes(attribute)
                 }
                 return elements
             }
@@ -65,14 +65,14 @@ package extension MarkdownRenderer {
         return selfReferencingSection(named: sectionName, content: items)
     }
     
-    private func _singleTaskGroupElements(for taskGroup: TaskGroupInfo) -> [XMLElement] {
+    private func _singleTaskGroupElements(for taskGroup: TaskGroupInfo) -> [HTMLElement] {
         let listItems = taskGroup.references.compactMap { reference in
             linkProvider.element(for: reference).map { _taskGroupItem(for: $0) }
         }
         // Don't return a title or abstract/discussion if this group has no links to display.
         guard !listItems.isEmpty else { return [] }
         
-        var items: [XMLElement] = []
+        var items: [HTMLElement] = []
         // Title
         if let title = taskGroup.title {
             items.append(selfReferencingHeading(level: 3, content: [.text(title)], plainTextTitle: title))
@@ -80,24 +80,24 @@ package extension MarkdownRenderer {
         // Abstract/Discussion
         for markup in taskGroup.content {
             let rendered = visit(markup)
-            if let element = rendered as? XMLElement {
-                items.append(element)
+            if case .element = rendered.storage {
+                items.append(rendered)
             } else {
                 // Wrap any inline content in an element. This is not expected to happen in practice
-                items.append(.element(named: "p", children: [rendered]))
+                items.append(.element(.p, children: [rendered]))
             }
         }
         // Links
-        items.append(.element(named: "ul", children: listItems))
+        items.append(.element(.ul, children: listItems))
         
         return items
     }
     
-    private func _taskGroupItem(for element: LinkedElement) -> XMLElement {
-        let items: [XMLNode]
+    private func _taskGroupItem(for element: LinkedElement) -> HTMLElement {
+        let items: [HTMLElement]
         switch element.subheadings {
         case .single(.conceptual(let title)):
-            let item = XMLNode.element(named: "p", children: [.text(title)])
+            var item = HTMLElement.element(.p, children: [.text(title)])
             if goal == .richness {
                 // TODO: Pass information about the type of icon that the conceptual element should display.
                 item.addAttributes(["class": "api-collection"])
@@ -107,7 +107,7 @@ package extension MarkdownRenderer {
         case .single(.symbol(let fragments)):
             items = switch goal {
             case .conciseness:
-                [ .element(named: "code", children: [.text(fragments.map(\.text).joined())]) ]
+                [ .element(.code, children: [.text(fragments.map(\.text).joined())]) ]
             case .richness:
                 [ _symbolSubheading(fragments, languageFilter: nil) ]
             }
@@ -127,9 +127,9 @@ package extension MarkdownRenderer {
             }
         }
         
-        let listItem = XMLNode.element(named: "li", children: [
+        var listItem = HTMLElement.element(.li, children: [
             // DocC-Render only makes the item's name an anchor, not its abstract
-            .element(named: "a", children: items, attributes: ["href": path(to: element.path)])
+            .element(.a, children: items, attributes: ["href": path(to: element.path)])
         ])
         
         // Add the formatted abstract if the linked element has one.
@@ -154,21 +154,21 @@ package extension MarkdownRenderer {
     /// ```
     /// <code>class SomeClass</code>
     /// ```
-    private func _symbolSubheading(_ fragments: [LinkedElement.SymbolNameFragment], languageFilter: SourceLanguage?) -> XMLElement {
+    private func _symbolSubheading(_ fragments: [LinkedElement.SymbolNameFragment], languageFilter: SourceLanguage?) -> HTMLElement {
         switch goal {
         case .richness:
             .element(
-                named: "code",
+                .code,
                 children: fragments.map {
-                    .element(named: "span", children: wordBreak(symbolName: $0.text), attributes: ["class": $0.kind.rawValue])
+                    .element(.span, children: wordBreak(symbolName: $0.text), attributes: ["class": $0.kind.rawValue])
                 },
-                attributes: languageFilter.map { ["class": "\($0.id)-only"] }
+                attributes: languageFilter.map { ["class": "\($0.id)-only"] } ?? [:]
             )
         case .conciseness:
             .element(
-                named: "code",
+                .code,
                 children: [.text(fragments.map(\.text).joined())],
-                attributes: languageFilter.map { ["class": "\($0.id)-only"] }
+                attributes: languageFilter.map { ["class": "\($0.id)-only"] } ?? [:]
             )
         }
     }
