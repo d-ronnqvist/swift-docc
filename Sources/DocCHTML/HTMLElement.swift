@@ -12,157 +12,36 @@ package import struct Foundation.Data // Used as a return value by the formatter
 
 // MARK: Element
 
-
-package struct HTMLElement {
-    package enum Tag: UInt8 {
-        case html
-        
-        // Metadata
-        
-        case head
-        case title
-        case style
-        // `base`, `link`, and `meta` are void-elements
-        
-        // Sections
-        
-        case body
-        case article
-        case section
-        case nav
-        case aside
-        case h1, h2, h3, h4, h5, h6
-        case hgroup
-        case header
-        case footer
-        case address
-        
-        // Grouping
-        
-        case p
-        case pre
-        case blockquote
-        case ol
-        case ul
-        case menu
-        case li
-        case dl
-        case dt
-        case dd
-        case figure
-        case figcaption
-        case main
-        case search
-        case div
-        // `hr` is a void-element
-        
-        // Text-level semantics
-        
-        case a
-        case em
-        case strong
-        case small
-        case s
-        case cite
-        case q
-        case dfn
-        case abbr
-        case ruby
-        case rt
-        case rp
-        case data
-        case time
-        case code
-        case `var`
-        case samp
-        case kbd
-        case sub, sup
-        case i
-        case b
-        case u
-        case mark
-        case bdi
-        case bdo
-        case span
-        // `br` and `wbr` are void-elements
-        
-        // Embedded
-        
-        case picture
-        case iframe
-        case object
-        case video
-        case audio
-        case map
-        // `source`, `img`, `embed`, `track`, and `area` are void-elements
-        
-        // Tables
-        
-        case table
-        case caption
-        case colgroup
-        // `col` is a void-element
-        case tbody
-        case thead
-        case tfoot
-        case tr
-        case td
-        case th
-        
-        // Forms
-        
-        case form
-        case label
-        // `input` in a void-element
-        case button
-        case select
-        case datalist
-        case optgroup
-        case option
-        case textarea
-        case output
-        case progress
-        case meter
-        case fieldset
-        case legend
-        case selectedcontent
-        
-        // Interactive
-        
-        case details
-        case summary
-        case dialog
-        
-        // Scripting
-        
-        case script
-        case noscript
-        case template
-        case slot
-        case canvas
-    }
-    
-    package enum VoidTag: UInt8 {
-        // Metadata
-        case base, link, meta
-        // Grouping
-        case hr
-        // Text-level semantics
-        case br, wbr
-        // Embedded
-        case source, img, embed, track, area
-        // Tables
-        case col
-        // Forms
-        case input
-    }
-    
+package struct HTMLElement: Sendable {
     /*fileprivate*/package enum Storage {
         case text(String)
         case element(Tag, attributes: [String: String], children: [HTMLElement])
-        case voidElement(VoidTag, attributes: [String: String])
+        case voidElement(Tag, attributes: [String: String])
     }
     /*fileprivate*/package var storage: Storage
+    
+    /*fileprivate*/ package static func text(_ text: consuming String) -> HTMLElement {
+        .init(storage: .text(text))
+    }
+//    /*fileprivate*/ static func element(_ tag: Tag, attributes: [String: String] = [:], @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+//        .init(storage: .element(tag, attributes: attributes, children: children()))
+//    }
+    /*fileprivate*/ package static func element(_ tag: Tag, attributes: [String: String] = [:], children: [HTMLElement]) -> HTMLElement {
+        assert(!tag.isVoid, "Cannot create an element using void tag '\(tag.name)'. Use `.voidElement(...)` instead.")
+        assert(attributes.keys.count == Set(attributes.keys.map { $0.lowercased() }).count, "All attribute names has to be case insensitively unique. This wasn't true for ...")
+        assert(children.allSatisfy { $0.elementTag == nil || tag.canOmitEndTag(whenFollowedBy: $0.elementTag) == false }, "Element '\(tag.name)' cannot contain ...")
+        assert(!attributes.isEmpty || !children.isEmpty, "Tag '\(tag.name)' is unexpectedly empty (no attributes and no members).")
+        return .init(storage: .element(tag, attributes: attributes, children: children))
+    }
+    
+    /*fileprivate*/ package static func element(_ tag: Tag, children: [HTMLElement], attributes: [String: String]) -> HTMLElement {
+        .element(tag, attributes: attributes, children: children)
+    }
+    
+    /*fileprivate*/ package static func voidElement(_ tag: Tag, attributes: [String: String] = [:]) -> HTMLElement {
+        assert(tag.isVoid, "")
+        return .init(storage: .voidElement(tag, attributes: attributes))
+    }
     
     fileprivate var elementTag: Tag? {
         if case .element(let tag, _, _) = storage {
@@ -180,25 +59,7 @@ package struct HTMLElement {
         }
     }
     
-    /*fileprivate*/ package static func text(_ text: consuming String) -> HTMLElement {
-        .init(storage: .text(text))
-    }
-    /*fileprivate*/ static func element(_ tag: Tag, attributes: [String: String] = [:], @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
-        .init(storage: .element(tag, attributes: attributes, children: children()))
-    }
-    /*fileprivate*/ package static func element(_ tag: Tag, attributes: [String: String] = [:], children: [HTMLElement]) -> HTMLElement {
-        .init(storage: .element(tag, attributes: attributes, children: children))
-    }
-    
-    /*fileprivate*/ package static func element(_ tag: Tag, children: [HTMLElement], attributes: [String: String]) -> HTMLElement {
-        .init(storage: .element(tag, attributes: attributes, children: children))
-    }
-    
-    /*fileprivate*/ package static func voidElement(_ tag: VoidTag, attributes: [String: String] = [:]) -> HTMLElement {
-        .init(storage: .voidElement(tag, attributes: attributes))
-    }
-    
-    
+    // FIXME: REMOVE THIS
     package mutating func addChild(_ child: HTMLElement) {
         if case .element(let tag, let attributes, var children) = storage {
             children.append(child)
@@ -206,9 +67,9 @@ package struct HTMLElement {
         }
     }
     
+    // FIXME: REMOVE THIS
     package mutating func addAttributes(_ newAttributes: [String: String]) {
         switch storage {
-            
             case .element(let tag, var attributes, let children):
                 attributes.merge(newAttributes, uniquingKeysWith: { _, new in new })
                 storage = .element(tag, attributes: attributes, children: children)
@@ -344,25 +205,16 @@ package struct HTMLFormatter {
     }
     
     private mutating func _prettyFormat(_ element: HTMLElement, state: PrettyPrintingState) {
-//        let whitespaceLength = 1 /* the newline */ &+ Int(state.depth) &* 2
-//        withUnsafeTemporaryAllocation(of: UInt8.self, capacity: whitespaceLength) { indentationBuffer in
-//            indentationBuffer.initialize(repeating: .init(ascii: " "))
-//            indentationBuffer[0] = .init(ascii: "\n")
-//            defer {
-//                indentationBuffer.deinitialize()
-//            }
-            
-            func addNewLineIndentation(depth: UInt8 = state.depth) {
-//                buffer.append(contentsOf: indentationBuffer)
-                Self._indentationData.withUnsafeBufferPointer {
-                    buffer.append(contentsOf: $0.prefix(1 /* the newline */ &+ Int(depth) &* 2 /* two spaces per indentation level */))
-                }
+        func appendLineBreakAndIndentation(depth: UInt8 = state.depth) {
+            Self._indentationData.withUnsafeBufferPointer {
+                buffer.append(contentsOf: $0.prefix(1 /* the newline */ &+ Int(depth) &* 2 /* two spaces per indentation level */))
             }
-            
-            switch element.storage {
+        }
+        
+        switch element.storage {
             case .text(let text):
                 if !state.presentOnSameLine {
-                    addNewLineIndentation()
+                    appendLineBreakAndIndentation()
                 }
                 _format(text: consume text)
                 
@@ -376,7 +228,7 @@ package struct HTMLFormatter {
                 
             case .element(let tag, let attributes, let children):
                 if !state.presentOnSameLine {
-                    addNewLineIndentation()
+                    appendLineBreakAndIndentation()
                 }
                 // Add the start tag
                 buffer.append(.init(ascii: "<"))
@@ -406,7 +258,7 @@ package struct HTMLFormatter {
                     // Whitespace is significant inside `<pre>` elements; so we switch to formatting that sub-hierarchy _without_ pretty printing.
                     if child.elementTag == .pre {
                         // However, first we add a new line and indentation so that the `<pre>` element starts appropriately indented on a new line.
-                        addNewLineIndentation(depth: childState.depth)
+                        appendLineBreakAndIndentation(depth: childState.depth)
                         _compactFormat(child, nextElementTag: childState.nextElement)
                     } else {
                         _prettyFormat(child, state: childState)
@@ -418,7 +270,7 @@ package struct HTMLFormatter {
                     return
                 }
                 if !presentChildrenOnSameLine {
-                    addNewLineIndentation()
+                    appendLineBreakAndIndentation()
                 }
                 //            buffer.append(contentsOf: "</".utf8)
                 _add_s("</")
@@ -428,14 +280,13 @@ package struct HTMLFormatter {
                 
             case .voidElement(let voidTag, let attributes):
                 if !state.presentOnSameLine {
-                    addNewLineIndentation()
+                    appendLineBreakAndIndentation()
                 }
                 buffer.append(.init(ascii: "<"))
                 voidTag.name.withUTF8Buffer { buffer.append(contentsOf: $0) }
                 _format(attributes: consume attributes)
                 buffer.append(.init(ascii: ">"))
-            }
-//        }
+        }
     }
     
     private mutating func _add(_ string: consuming String) {
@@ -450,32 +301,12 @@ package struct HTMLFormatter {
     }
     
     private mutating func _format(text: consuming String) {
+        // This can be made nicer with UTF8Span when we can require anyAppleOS 26+
         var text = consume text
-//        text.utf8Span.withUnsafeBytes {
         text.withUTF8 {
             var remaining = $0[...]
             
-//            buffer.append(addingCapacity: pointer.count * 4) { span in
-//                func _add_s(_ string: StaticString) {
-//                    string.withUTF8Buffer {
-//                        for c in $0 {
-//                            span.append(c)
-//                        }
-//                    }
-//                }
-//                
-//                for char in pointer {
-//                    switch char {
-//                    case .init(ascii: "&"): _add_s("&amp;") //buffer.append(contentsOf: "&amp;".utf8)
-//                    case .init(ascii: "<"): _add_s("&lt;") //buffer.append(contentsOf: "&lt;".utf8)
-//                    case .init(ascii: ">"): _add_s("&gt;") //buffer.append(contentsOf: "&gt;".utf8)
-//                    default: span.append(char)
-//                    }
-//                }
-//                
-//            }
-            
-            
+//
             while let index = remaining.firstIndex(where: \.needsEscapingInHTMLText) {
                 buffer.append(contentsOf: remaining[..<index])
                 switch remaining[index] {
@@ -509,6 +340,7 @@ package struct HTMLFormatter {
     
     private mutating func _format(attributes: [String: String]) {
         func _format(value: consuming String) {
+            // This can be made nicer with UTF8Span when we can require anyAppleOS 26+
             var value = consume value
             value.withUTF8 {
                 var remaining = $0[...]
@@ -555,15 +387,9 @@ package struct HTMLFormatter {
             _format(value: consume value)
         }
     }
-    
-    private mutating func _format(comment: String) {
-        buffer.append(contentsOf: "<!--".utf8)
-        buffer.append(contentsOf: comment.utf8)
-        buffer.append(contentsOf: "-->".utf8)
-    }
 }
 
-private extension UInt8 {
+private extension UTF8.CodeUnit {
     var needsEscapingInHTMLText: Bool {
         return self == .init(ascii: "&")
             || self == .init(ascii: "<")
@@ -573,8 +399,10 @@ private extension UInt8 {
         return self == .init(ascii: "&")
             || self == .init(ascii: "\"") // Because the formatter uses `"` to quote the attribute value, we don't need to escape `'`.
     }
+    /// A Boolean value that determines whether this UTF-8 code unit
+    ///
+    /// An attribute value can remain unquoted if it doesn't contain ASCII whitespace or any of " ' ` = < >
     var needsQuotingInHTMLAttribute: Bool {
-        // The attribute value can remain unquoted if it doesn't contain ASCII whitespace or any of " ' ` = < >
         return self == .init(ascii: " " )
             || self == .init(ascii: "\t") // Tab
             || self == .init(ascii: "\n") // New line / Line feed
@@ -588,12 +416,10 @@ private extension UInt8 {
     }
 }
 
-// MARK: DSL
+// MARK: Result Builder
 
 @resultBuilder
 struct HTMLBuilder {
-    
-//    typealias Something = [HTMLElement]
     
 //    static func buildBlock(_ components: [HTMLElement]...) -> Something {
 //        components.flatMap { $0 }
@@ -657,47 +483,411 @@ struct HTMLBuilder {
 }
 
 
-//    
-//func p(
-//    id: String? = nil,
-//    classes: [String]? = nil,
-//    @HTMLBuilder _ children: () -> [HTMLElement]
-//) -> HTMLElement {
-//    var attributes = [String: String]()
-//    return .element(.p, children)
-//}
+// MARK: Tags
 
-//
-//struct MarkdownRendererTests {
-//    
-//    
-//    func dsl() {
-////        
-////        let node = p {
-////            "Before "
-////            
-////            b {
-////                "bold"
-////            }
-////            
-////           
-////            " after."
-////        }
-////        
-////        var res = ""
-////        node.render(into: &res)
-//        
-//    }
-//}
+// This only defined functions for the HTML elements that we've needed to create so far,
+// with only the parameters that we've needed to pass so far.
+// If you need another element you can add a new function here, following the style of the other functions.
+// If you need to pass new information to an existing element you can add a new parameter with a default value to that element's corresponding function.
 
+package func html(lang: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.html, attributes: lang.map { ["lang": $0] } ?? [:] , children: children())
+}
+
+// MARK Metadata
+
+package func head(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.head, children: children())
+}
+
+package func link(rel: consuming String, href: consuming String) -> HTMLElement {
+    .voidElement(.link, attributes: ["rel": rel, "href": href])
+}
+
+package func meta(attributes: consuming [String: String]) -> HTMLElement {
+    .voidElement(.meta, attributes: consume attributes)
+}
+
+// Sections
+
+package func body(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.body, children: children())
+}
+
+package func article(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.article, children: children())
+}
+
+package func section(id: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.section, attributes: id.map { ["id": $0] } ?? [:], children: children())
+}
+
+package func nav(id: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.nav, attributes: id.map { ["id": $0] } ?? [:], children: children())
+}
+
+package func aside(class classNames: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.aside, attributes: classNames.map { ["class": $0] } ?? [:], children: children())
+}
+
+package func h1(class classNames: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.h1, attributes: classNames.map { ["class": $0] } ?? [:], children: children())
+}
+
+package func h2(_ text: String) -> HTMLElement {
+    .element(.h2, children: [.text(text)])
+}
+
+func h1(children: [HTMLElement]) -> HTMLElement {
+    .element(.h2, children: children)
+}
+
+func h2(children: [HTMLElement]) -> HTMLElement {
+    .element(.h2, children: children)
+}
+
+func h3(children: [HTMLElement]) -> HTMLElement {
+    .element(.h3, children: children)
+}
+
+func h4(children: [HTMLElement]) -> HTMLElement {
+    .element(.h4, children: children)
+}
+
+func h5(children: [HTMLElement]) -> HTMLElement {
+    .element(.h5, children: children)
+}
+
+func h6(children: [HTMLElement]) -> HTMLElement {
+    .element(.h6, children: children)
+}
+
+package func hgroup(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.hgroup, children: children())
+}
+
+package func header(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.header, children: children())
+}
+
+package func footer(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.footer, children: children())
+}
+
+// Grouping
+
+package func p(class classNames: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.p, attributes: classNames.map { ["class": $0] } ?? [:], children: children())
+}
+
+package func pre(id: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.pre, attributes: id.map { ["id": $0] } ?? [:], children: children())
+}
+
+package func ol(class classNames: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    let listItems = children()
+    assert(listItems.allSatisfy { $0.elementTag == .li }, "<ol> tags can only contain <li> tags")
+    return .element(.ol, attributes: classNames.map { ["class": $0] } ?? [:], children: listItems)
+}
+
+package func ul(id: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    let listItems = children()
+    assert(listItems.allSatisfy { $0.elementTag == .li }, "<ul> tags can only contain <li> tags")
+    return .element(.ul, attributes: id.map { ["id": $0] } ?? [:], children: listItems)
+}
+
+package func li(attributes: consuming [String: String] = [:], @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.li, attributes: consume attributes, children: children())
+}
+
+package func dl(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    let listItems = children()
+    assert(listItems.allSatisfy { $0.elementTag == .dt || $0.elementTag == .dd }, "<dl> tags can only contain <dt> and <dt> tags")
+    return .element(.dl, children: listItems)
+}
+
+package func dt(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    let content = children()
+    assert(content.allSatisfy { $0.elementTag != .footer && $0.elementTag == .header }, "<dd> tags cannot contain <header> or <footer> tags")
+    return .element(.dt, children: content)
+}
+
+package func dd(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    return .element(.dd, children: children())
+}
+
+package let hr = HTMLElement.voidElement(.hr)
+
+// Text-level semantics
+
+package func a(href: consuming String, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.a, attributes: ["href": href], children: children())
+}
+
+func s(children: [HTMLElement]) -> HTMLElement {
+    .element(.s, children: children)
+}
+
+package func code(class classNames: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.code, attributes: classNames.map { ["class": $0] } ?? [:], children: children())
+}
+
+func i(children: [HTMLElement]) -> HTMLElement {
+    .element(.i, children: children)
+}
+
+func b(children: [HTMLElement]) -> HTMLElement {
+    .element(.b, children: children)
+}
+
+package func span(class classNames: consuming String? = nil, @HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.span, attributes: classNames.map { ["class": $0] } ?? [:], children: children())
+}
+
+package let br = HTMLElement.voidElement(.br)
+
+package let wbr = HTMLElement.voidElement(.wbr)
+
+// Embedded
+
+package func picture(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.picture, children: children())
+}
+
+func img(attributes: consuming [String: String]) -> HTMLElement {
+    .voidElement(.img, attributes: consume attributes)
+}
+
+func source(attributes: consuming [String: String]) -> HTMLElement {
+    .voidElement(.source, attributes: consume attributes)
+}
+
+// Tables
+
+func table(children: [HTMLElement]) -> HTMLElement {
+    .element(.table, children: children)
+}
+
+func thead(children: [HTMLElement]) -> HTMLElement {
+    assert(children.allSatisfy { $0.elementTag == .tr }, "<thead> tags can only contain <tr> tags")
+    return .element(.thead, children: children)
+}
+
+func tbody(children: [HTMLElement]) -> HTMLElement {
+    assert(children.allSatisfy { $0.elementTag == .tr }, "<thead> tags can only contain <tr> tags")
+    return .element(.tbody, children: children)
+}
+
+func tr(colspan: UInt = 0, rowspan: UInt = 0, class className: consuming String? = nil, children: [HTMLElement]) -> HTMLElement {
+    assert(children.allSatisfy { $0.elementTag == .td || $0.elementTag == .th }, "<tr> tags can only contain <td> and <th> tags")
+    var attributes = [String: String]()
+    if colspan > 0 {
+        attributes["colspan"] = colspan.description
+    }
+    if rowspan > 0 {
+        attributes["rowspan"] = rowspan.description
+    }
+    if let className {
+        attributes["class"] = consume className
+    }
+    return .element(.tr, attributes: attributes, children: children)
+}
+
+func td(colspan: UInt = 0, rowspan: UInt = 0, class className: consuming String? = nil, children: [HTMLElement]) -> HTMLElement {
+    var attributes = [String: String]()
+    if colspan > 0 {
+        attributes["colspan"] = colspan.description
+    }
+    if rowspan > 0 {
+        attributes["rowspan"] = rowspan.description
+    }
+    if let className {
+        attributes["class"] = consume className
+    }
+    return .element(.tr, attributes: attributes, children: children)
+}
+
+// Forms
+
+package func label(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.label, children: children())
+}
+
+package func input(attributes: consuming [String: String]) -> HTMLElement {
+    .voidElement(.input, attributes: consume attributes)
+}
+
+package func fieldset(@HTMLBuilder _ children: () -> [HTMLElement]) -> HTMLElement {
+    .element(.fieldset, children: children())
+}
+
+// FIXME: This should be private
+package extension HTMLElement {
+    enum Tag: UInt8 {
+        case html
+        
+        // Metadata
+        
+        case head
+        case title
+        case style
+        case base // a void element
+        case link // a void element
+        case meta // a void element
+        
+        // Sections
+        
+        case body
+        case article
+        case section
+        case nav
+        case aside
+        case h1, h2, h3, h4, h5, h6
+        case hgroup
+        case header
+        case footer
+        case address
+        
+        // Grouping
+        
+        case p
+        case pre
+        case blockquote
+        case ol
+        case ul
+        case menu
+        case li
+        case dl
+        case dt
+        case dd
+        case figure
+        case figcaption
+        case main
+        case search
+        case div
+        case hr // a void-element
+        
+        // Text-level semantics
+        
+        case a
+        case em
+        case strong
+        case small
+        case s
+        case cite
+        case q
+        case dfn
+        case abbr
+        case ruby
+        case rt
+        case rp
+        case data
+        case time
+        case code
+        case `var`
+        case samp
+        case kbd
+        case sub, sup
+        case i
+        case b
+        case u
+        case mark
+        case bdi
+        case bdo
+        case span
+        case br  // a void-element
+        case wbr // a void-element
+        
+        // Embedded
+        
+        case picture
+        case iframe
+        case object
+        case video
+        case audio
+        case map
+        case source // a void-element
+        case img    // a void-element
+        case embed  // a void-element
+        case track  // a void-element
+        case area   // a void-element
+        
+        // Tables
+        
+        case table
+        case caption
+        case colgroup
+        case col // a void-element
+        case tbody
+        case thead
+        case tfoot
+        case tr
+        case td
+        case th
+        
+        // Forms
+        
+        case form
+        case label
+        case input // a void-element
+        case button
+        case select
+        case datalist
+        case optgroup
+        case option
+        case textarea
+        case output
+        case progress
+        case meter
+        case fieldset
+        case legend
+        case selectedcontent
+        
+        // Interactive
+        
+        case details
+        case summary
+        case dialog
+        
+        // Scripting
+        
+        case script
+        case noscript
+        case template
+        case slot
+        case canvas
+    }
+}
 
 private extension HTMLElement.Tag {
+    var isVoid: Bool {
+        switch self {
+            case .base, .link, .meta,                  // Metadata
+                 .hr,                                  // Grouping
+                 .br, .wbr,                            // Text-level semantics
+                 .source, .img, .embed, .track, .area, // Embedded
+                 .col,                                 // Tables
+                 .input:                               // Forms
+                     true
+            default: false
+        }
+    }
+    
+    // FIXME: USE THIS!
+    var canPrettyPrintInline: Bool {
+        // Our pretty printer can include any "text-level semantic" tag inline
+        Self.a.rawValue <= self.rawValue && self.rawValue <= Self.wbr.rawValue
+    }
+    
     var name: StaticString {
         switch self {
             case .html:       "html"
             case .head:       "head"
             case .title:      "title"
             case .style:      "style"
+            case .base:       "base"
+            case .link:       "link"
+            case .meta:       "meta"
             case .body:       "body"
             case .article:    "article"
             case .section:    "section"
@@ -728,6 +918,7 @@ private extension HTMLElement.Tag {
             case .main:       "main"
             case .search:     "search"
             case .div:        "div"
+            case .hr:         "hr"
             case .a:          "a"
             case .em:         "em"
             case .strong:     "strong"
@@ -755,15 +946,23 @@ private extension HTMLElement.Tag {
             case .bdi:        "bdi"
             case .bdo:        "bdo"
             case .span:       "span"
+            case .br:         "br"
+            case .wbr:        "wbr"
             case .picture:    "picture"
             case .iframe:     "iframe"
             case .object:     "object"
             case .video:      "video"
             case .audio:      "audio"
             case .map:        "map"
+            case .source:     "source"
+            case .img:        "img"
+            case .embed:      "embed"
+            case .track:      "track"
+            case .area:       "area"
             case .table:      "table"
             case .caption:    "caption"
             case .colgroup:   "colgroup"
+            case .col:        "col"
             case .tbody:      "tbody"
             case .thead:      "thead"
             case .tfoot:      "tfoot"
@@ -772,6 +971,7 @@ private extension HTMLElement.Tag {
             case .th:         "th"
             case .form:       "form"
             case .label:      "label"
+            case .input:      "input"
             case .button:     "button"
             case .select:     "select"
             case .datalist:   "datalist"
@@ -802,7 +1002,7 @@ private extension HTMLElement.Tag {
         switch self {
         case .p:
             switch next {
-            case .address, .article, .aside, .blockquote, .details, .dialog, .div, .dl, .fieldset, .figcaption, .figure, .footer, .form, .h1, .h2, .h3, .h4, .h5, .h6, .hgroup, /*.hr,*/ .main, .menu, .nav, .ol, .p, .pre, .search, .section, .table, .ul, nil:
+            case .address, .article, .aside, .blockquote, .details, .dialog, .div, .dl, .fieldset, .figcaption, .figure, .footer, .form, .h1, .h2, .h3, .h4, .h5, .h6, .hgroup, .hr, .main, .menu, .nav, .ol, .p, .pre, .search, .section, .table, .ul, nil:
                 true
             default:
                 false
@@ -839,34 +1039,13 @@ private extension HTMLElement.Tag {
             next == .td || next == .th || next == nil
             
         case .optgroup:
-            next == .optgroup || /*next == .hr ||*/ next == nil
+            next == .optgroup || next == .hr || next == nil
             
         case .option:
-            next == .option || next == .optgroup || /*next == .hr ||*/ next == nil
+            next == .option || next == .optgroup || next == .hr || next == nil
             
         default:
             false
-        }
-    }
-}
-
-
-private extension HTMLElement.VoidTag {
-    var name: StaticString {
-        switch self {
-            case .base:   "base"
-            case .link:   "link"
-            case .meta:   "meta"
-            case .hr:     "hr"
-            case .br:     "br"
-            case .wbr:    "wbr"
-            case .source: "source"
-            case .img:    "img"
-            case .embed:  "embed"
-            case .track:  "track"
-            case .area:   "area"
-            case .col:    "col"
-            case .input:  "input"
         }
     }
 }
