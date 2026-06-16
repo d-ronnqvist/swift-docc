@@ -27,88 +27,77 @@ package extension HTMLRenderer {
     ///   - reference: The reference that the content and metadata is associated with.
     /// - Returns: A full-page static HTML document.
     static func makeFullPage(
-        mainContent: HTMLElement,
+        mainContent: HTMLNode,
         metadata: (title: String, description: String?),
         for reference: ResolvedTopicReference,
         customHeader: XMLNode? = nil,
         customFooter: XMLNode? = nil
-    ) -> HTMLElement {
+    ) -> HTMLNode {
         // Use relative paths to shared assets like a style sheet or favicon.
         let pathPrefixToArchiveRoot = String(repeating: "../", count: reference.url.pathComponents.count - 1)
         
-        var head = HTMLElement.element(.head, children: [
-            .voidElement(.meta, attributes: ["charset": "utf-8"]),
-            .voidElement(.meta, attributes: [
-                "name": "viewport",
-                "content": "width=device-width,initial-scale=1,viewport-fit=cover",
-            ]),
-            // FIXME: Add relative favicon links (rdar://177705447 (Include favicon images in the static HTML output))
-            .voidElement(.link, attributes: [
-                "rel": "stylesheet",
-                "href": "\(pathPrefixToArchiveRoot)reference.css",
-            ]),
-            .element(.title, children: [.text(metadata.title)])
-        ])
-        if let description = metadata.description {
-            head.addChild(.voidElement(.meta, attributes: [
-                "name": "description",
-                "content": description,
-            ]))
-        }
-        
-        // The full page body consists of 5 elements, in order;
-        let body = HTMLElement.element(.body, children: [
-        // 1. An optional custom header
-//        if let customHeader {
-//            body.addChild(customHeader.copy() as! XMLNode)
-//        }
-        
-            // 2. The default header
-            .element(.header, children: [
-                // FIXME: Make this a button that toggles the navigator sidebar (rdar://177705101)
-                // This is blocked by the sidebar requiring RenderNode input
-                .element(.h2, children: [.text("Documentation")]),
+        return html(lang: "en-US") {
+            head {
+                meta(charset: "utf-8")
+                meta(viewport: "width=device-width,initial-scale=1,viewport-fit=cover")
                 
-                // FIXME: Support switching between language representations of the page (rdar://177705327)
-                // The rough idea is to use <select> & <option> elements (when there are multiple languages)
-                // and to add some very minimal JavaScript to modify the display of the "swift-only" and "occ-only" CSS classes based on that selection.
-                .element(.span, children: [.text("Language: Swift")])
-            ]),
-            
-            // 3. The unique documentation content for this page
-            mainContent,
-            
-            // 4. The default footer
-            .element(.footer, children: [
-                // FIXME: Interacting with this radio group doesn't change the page's color scheme (rdar://177705056)
-                .element(.fieldset, children: [
-                    .element(.legend, children: [.text("Select a color scheme preference")]),
+                // FIXME: Add relative favicon links (rdar://177705447 (Include favicon images in the static HTML output))
+                link(rel: "stylesheet", href: "\(pathPrefixToArchiveRoot)reference.css")
+                
+                title(metadata.title)
+                
+                if let description = metadata.description {
+                    meta(description: description)
+                }
+            }
+            body {
+                // 1. An optional custom header
+                //        if let customHeader {
+                //            body.addChild(customHeader.copy() as! XMLNode)
+                //        }
+                
+                // 2. The default header
+                header {
+                    // FIXME: Make this a button that toggles the navigator sidebar (rdar://177705101)
+                    // This is blocked by the sidebar requiring RenderNode input
+                    h2("Documentation")
                     
-                    .element(.label, children: [
-                        .voidElement(.input, attributes: ["type": "radio", "name": "color-scheme", "value": "light"]),
-                        .text("Light"),
-                    ]),
-                    .element(.label, children: [
-                        .voidElement(.input, attributes: ["type": "radio", "name": "color-scheme", "value": "dark"]),
-                        .text("Dark"),
-                    ]),
-                    .element(.label, children: [
-                        .voidElement(.input, attributes: ["type": "radio", "name": "color-scheme", "value": "auto", "checked": ""]),
-                        .text("Auto"),
-                    ]),
-                ], attributes: ["role": "radiogroup"])
-            ])
-        
-        ])
-        
-//        // 5. An optional custom footer
-//        if let customFooter {
-//            body.addChild(customFooter.copy() as! XMLNode)
-//        }
-        
-        return HTMLElement.element(.html, attributes: ["lang": "en-US"], children: [
-            head, body
-        ])
+                    // FIXME: Support switching between language representations of the page (rdar://177705327)
+                    // The rough idea is to use <select> & <option> elements (when there are multiple languages)
+                    // and to add some very minimal JavaScript to modify the display of the "swift-only" and "occ-only" CSS classes based on that selection.
+                    span { "Language: Swift" }
+                }
+                
+                // 3. The unique documentation content for this page
+                mainContent
+                
+                // 4. The default footer
+                footer {
+                    // FIXME: Interacting with this radio group doesn't change the page's color scheme (rdar://177705056)
+                    fieldset(role: "radiogroup") {
+                        legend("Select a color scheme preference")
+                        
+                        label {
+                            input(attributes: ["type": "radio", "name": "color-scheme", "value": "light"])
+                            HTMLNode.text("Light")
+                        }
+                        label {
+                            input(attributes: ["type": "radio", "name": "color-scheme", "value": "dark"])
+                            HTMLNode.text("Dark")
+                        }
+                        label {
+                            input(attributes: ["type": "radio", "name": "color-scheme", "value": "auto", "checked": ""])
+                            HTMLNode.text("Auto")
+                        }
+                    }
+                }
+                
+//                // 5. An optional custom footer
+//                if let customFooter {
+//                    body.addChild(customFooter.copy() as! XMLNode)
+//                }
+            }
+        }
     }
     
     /// Prepares the provided custom header and footer files to be included in the full-page structure.
@@ -133,4 +122,16 @@ package extension HTMLRenderer {
             customFooter: try customFooter.map(parse(contentsOf:))
         )
     }
+}
+
+private func meta(charset: String) -> HTMLNode {
+    meta(attributes: ["charset": charset])
+}
+
+private func meta(viewport: String) -> HTMLNode {
+    meta(attributes: ["name": "viewport", "content": viewport])
+}
+
+private func meta(description: String) -> HTMLNode {
+    meta(attributes: ["name": "description", "content": description])
 }

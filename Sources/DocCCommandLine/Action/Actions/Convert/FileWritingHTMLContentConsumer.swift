@@ -80,17 +80,17 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
         }
         
         func makeContent(
-            content: HTMLElement,
+            content: HTMLNode,
             title: String,
             plainDescription: String?,
             prettyPrint: Bool
         ) -> String {
             var copy = original
             // Replace the content in reverse order so that the earlier ranges remain valid.
-            copy.replaceSubrange(contentReplacementRange, with: String(decoding: HTMLFormatter.format(inPageElement: content, options: [.omitAllowedEndTags, .omitQuotingSingleWordAttributeValues]), as: UTF8.self))
+            copy.replaceSubrange(contentReplacementRange, with: String(decoding: HTMLFormatter.format(content, options: [.omitOptionalEndTags, .omitOptionalQuotesAroundAttributeValues]), as: UTF8.self))
             if let plainDescription {
-                let metaDescription = HTMLElement.voidElement(.meta, attributes: ["name": "description", "content": plainDescription])
-                copy.replaceSubrange(descriptionReplacementRange, with: String(decoding: HTMLFormatter.format(inPageElement: metaDescription, options: .omitQuotingSingleWordAttributeValues), as: UTF8.self))
+                let metaDescription = meta(attributes: ["name": "description", "content": plainDescription])
+                copy.replaceSubrange(descriptionReplacementRange, with: String(decoding: HTMLFormatter.format(metaDescription, options: .omitOptionalQuotesAroundAttributeValues), as: UTF8.self))
             }
             copy.replaceSubrange(titleReplacementRange,   with: title)
             
@@ -135,7 +135,7 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
     }
     
     func consume(
-        mainContent: HTMLElement,
+        mainContent: HTMLNode,
         metadata: (title: String, description: String?),
         forPage reference: ResolvedTopicReference
     ) throws {

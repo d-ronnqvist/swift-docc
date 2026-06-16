@@ -46,13 +46,13 @@ struct FullPageHTMLContentConsumer: HTMLContentConsumer {
     }
     
     func consume(
-        mainContent: HTMLElement,
+        mainContent: HTMLNode,
         metadata: (title: String, description: String?),
         forPage reference: ResolvedTopicReference
     ) throws {
         let page = HTMLRenderer.makeFullPage(mainContent: mainContent, metadata: metadata, for: reference, customHeader: customHeader, customFooter: customFooter)
         
-        let htmlData = DocCHTML.HTMLFormatter.format(document: page, options: [.omitQuotingSingleWordAttributeValues, .prettyPrint])
+        let htmlData = DocCHTML.HTMLFormatter.format(page, options: [.omitOptionalQuotesAroundAttributeValues, .prettyPrint])
         let relativeFilePath = NodeURLGenerator.fileSafeReferencePath(reference, lowercased: true) + "/index.html"
         try fileWriter.write(htmlData, toFileSafePath: relativeFilePath)
     }

@@ -1,19 +1,13 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2025-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
  See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
-#if canImport(FoundationXML)
-// TODO: Consider other HTML rendering options as a future improvement (rdar://165755530)
-package import FoundationXML
-#else
-package import Foundation
-#endif
 
 package extension MarkdownRenderer {
     /// Information about the versions that a piece of API is available for a given platform.
@@ -36,8 +30,8 @@ package extension MarkdownRenderer {
     }
     
     /// Creates an HTML element that describes the versions that a piece of API is available for the platforms described in the given availability information.
-    func availability(_ info: [AvailabilityInfo]) -> HTMLElement {
-        let items: [HTMLElement] = info.map {
+    func availability(_ info: [AvailabilityInfo]) -> HTMLNode {
+        ul(id: "availability", contents: info.map {
             var text = $0.name
             
             let description: String
@@ -63,13 +57,7 @@ package extension MarkdownRenderer {
                 attributes["class"] = "deprecated"
             }
             
-            return .element(.li, children: [.text(text)], attributes: goal == .richness ? attributes : [:])
-        }
-        
-        return .element(
-            .ul,
-            attributes: ["id": "availability"],
-            children: items
-        )
+            return li(attributes: goal == .richness ? attributes : [:], contents: [.text(text)])
+        })
     }
 }

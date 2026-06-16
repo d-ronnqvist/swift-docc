@@ -210,7 +210,7 @@ final class FileWritingHTMLContentConsumerTests: XCTestCase {
             <link rel="icon" href="/favicon.ico" />
             <title>ModuleName</title>
             <script>var baseUrl = "/"</script>
-            <meta content="Some formatted description of this module" name="description"/>
+            <meta content="Some formatted description of this module" name="description">
           </head>
           <body>
             <noscript>
@@ -262,7 +262,7 @@ final class FileWritingHTMLContentConsumerTests: XCTestCase {
             <link rel="icon" href="/favicon.ico" />
             <title>SomeClass</title>
             <script>var baseUrl = "/"</script>
-            <meta content="Some in-source description of this class." name="description"/>
+            <meta content="Some in-source description of this class." name="description">
           </head>
           <body>
             <noscript>
@@ -322,7 +322,7 @@ final class FileWritingHTMLContentConsumerTests: XCTestCase {
             <link rel="icon" href="/favicon.ico" />
             <title>someMethod(with:and:)</title>
             <script>var baseUrl = "/"</script>
-            <meta content="Some in-source description of this method." name="description"/>
+            <meta content="Some in-source description of this method." name="description">
           </head>
           <body>
             <noscript>
@@ -389,7 +389,7 @@ final class FileWritingHTMLContentConsumerTests: XCTestCase {
             <link rel="icon" href="/favicon.ico" />
             <title>Some article</title>
             <script>var baseUrl = "/"</script>
-            <meta content="This is a formatted article." name="description"/>
+            <meta content="This is a formatted article." name="description">
           </head>
           <body>
             <noscript>
@@ -439,7 +439,7 @@ final class FileWritingHTMLContentConsumerTests: XCTestCase {
             <link rel="icon" href="/favicon.ico" />
             <title>SomeProtocol</title>
             <script>var baseUrl = "/"</script>
-            <meta content="Some in-source description of this protocol." name="description"/>
+            <meta content="Some in-source description of this protocol." name="description">
           </head>
           <body>
             <noscript>
@@ -560,7 +560,7 @@ final class FileWritingHTMLContentConsumerTests: XCTestCase {
                     <meta charset="utf-8" />
                     <link rel="icon" href="/favicon.ico" />
                     <title>A single article</title>
-                    <meta content="This is a formatted article that becomes the root page (because there is only one page)." name="description"/>
+                    <meta content="This is a formatted article that becomes the root page (because there is only one page)." name="description">
                   </head>
                   <body>
                     <noscript>
@@ -573,9 +573,9 @@ final class FileWritingHTMLContentConsumerTests: XCTestCase {
                             <p>Article</p>
                             <h1>RootArticle</h1>
                           </hgroup>
-                          <p>This is a <i> formatted</i> article that becomes the root page (because there is only one page).</p>
-                        </section>
-                      </article>
+                    <p>This is a <i> formatted</i> article that becomes the root page (because there is only one page).</p>
+                  </section>
+                </article>
                     </noscript>
                     <div id="app"></div>
                   </body>

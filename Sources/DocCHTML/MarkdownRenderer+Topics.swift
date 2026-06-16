@@ -42,21 +42,24 @@ package extension MarkdownRenderer {
     ///
     /// If the API has the _same_ task groups in all language representations, only pass the task groups for one language.
     /// This produces a named section that doesn't hide any task groups for any of the languages (the same as if the symbol only had one language representation).
-    func groupedSection(named sectionName: String, groups taskGroups: [SourceLanguage: [TaskGroupInfo]]) -> [HTMLElement] {
+    func groupedSection(named sectionName: String, groups taskGroups: [SourceLanguage: [TaskGroupInfo]]) -> [HTMLNode] {
         let taskGroups = RenderHelpers.sortedLanguageSpecificValues(taskGroups)
         
-        let items: [HTMLElement] = if taskGroups.count == 1 {
+        let items: [HTMLNode] = if taskGroups.count == 1 {
             taskGroups.first!.value.flatMap { taskGroup in
                 _singleTaskGroupElements(for: taskGroup)
             }
         } else {
             // TODO: As a future improvement we could diff the references and only mark them as language-specific if the group and reference doesn't appear in all languages.
             taskGroups.flatMap { language, taskGroups in
-                let attribute = ["class": "\(language.id)-only"]
+                let className = "\(language.id)-only"
                 
-                var elements = taskGroups.flatMap { _singleTaskGroupElements(for: $0) }
-                for index in elements.indices {
-                    elements[index].addAttributes(attribute)
+                var elements = [HTMLNode]()
+                for taskGroup in taskGroups {
+                    for var element in _singleTaskGroupElements(for: taskGroup) {
+                        element.addClass(className)
+                        elements.append(element)
+                    }
                 }
                 return elements
             }
@@ -65,49 +68,45 @@ package extension MarkdownRenderer {
         return selfReferencingSection(named: sectionName, content: items)
     }
     
-    private func _singleTaskGroupElements(for taskGroup: TaskGroupInfo) -> [HTMLElement] {
+    private func _singleTaskGroupElements(for taskGroup: TaskGroupInfo) -> [HTMLNode] {
         let listItems = taskGroup.references.compactMap { reference in
             linkProvider.element(for: reference).map { _taskGroupItem(for: $0) }
         }
         // Don't return a title or abstract/discussion if this group has no links to display.
         guard !listItems.isEmpty else { return [] }
         
-        var items: [HTMLElement] = []
+        var items: [HTMLNode] = []
+        items.reserveCapacity(taskGroup.content.count + 1)
         // Title
         if let title = taskGroup.title {
             items.append(selfReferencingHeading(level: 3, content: [.text(title)], plainTextTitle: title))
         }
         // Abstract/Discussion
         for markup in taskGroup.content {
-            let rendered = visit(markup)
-            if case .element = rendered.storage {
-                items.append(rendered)
-            } else {
-                // Wrap any inline content in an element. This is not expected to happen in practice
-                items.append(.element(.p, children: [rendered]))
-            }
+            var rendered = visit(markup)
+            // Wrap any inline text in an element. This is not expected to happen in practice.
+            rendered.wrapInParagraphIfTextElement()
+            items.append(rendered)
         }
         // Links
-        items.append(.element(.ul, children: listItems))
+        items.append(ul(contents: listItems))
         
         return items
     }
     
-    private func _taskGroupItem(for element: LinkedElement) -> HTMLElement {
-        let items: [HTMLElement]
+    private func _taskGroupItem(for element: LinkedElement) -> HTMLNode {
+        let items: [HTMLNode]
         switch element.subheadings {
         case .single(.conceptual(let title)):
-            var item = HTMLElement.element(.p, children: [.text(title)])
-            if goal == .richness {
+            items = [
                 // TODO: Pass information about the type of icon that the conceptual element should display.
-                item.addAttributes(["class": "api-collection"])
-            }
-            items = [item]
+                p(class: goal == .richness ? "api-collection" : nil, contents: [.text(title)])
+            ]
             
         case .single(.symbol(let fragments)):
             items = switch goal {
             case .conciseness:
-                [ .element(.code, children: [.text(fragments.map(\.text).joined())]) ]
+                [ code(contents: [.text(fragments.map(\.text).joined())]) ]
             case .richness:
                 [ _symbolSubheading(fragments, languageFilter: nil) ]
             }
@@ -127,17 +126,17 @@ package extension MarkdownRenderer {
             }
         }
         
-        var listItem = HTMLElement.element(.li, children: [
+        var content = [
             // DocC-Render only makes the item's name an anchor, not its abstract
-            .element(.a, children: items, attributes: ["href": path(to: element.path)])
-        ])
+            a(href: path(to: element.path), contents: items)
+        ]
         
         // Add the formatted abstract if the linked element has one.
         if let abstract = element.abstract {
-            listItem.addChild(visit(abstract))
+            content.append(visit(abstract))
         }
         
-        return listItem
+        return li(contents: content)
     }
     
     /// Transforms the symbol name fragments into a `<code>` HTML element that represents a symbol's subheading.
@@ -154,22 +153,14 @@ package extension MarkdownRenderer {
     /// ```
     /// <code>class SomeClass</code>
     /// ```
-    private func _symbolSubheading(_ fragments: [LinkedElement.SymbolNameFragment], languageFilter: SourceLanguage?) -> HTMLElement {
+    private func _symbolSubheading(_ fragments: [LinkedElement.SymbolNameFragment], languageFilter: SourceLanguage?) -> HTMLNode {
         switch goal {
         case .richness:
-            .element(
-                .code,
-                children: fragments.map {
-                    .element(.span, children: wordBreak(symbolName: $0.text), attributes: ["class": $0.kind.rawValue])
-                },
-                attributes: languageFilter.map { ["class": "\($0.id)-only"] } ?? [:]
-            )
+            code(class: languageFilter.map { "\($0.id)-only" }, contents: fragments.map {
+                span(class: $0.kind.rawValue, contents: wordBreak(symbolName: $0.text))
+            })
         case .conciseness:
-            .element(
-                .code,
-                children: [.text(fragments.map(\.text).joined())],
-                attributes: languageFilter.map { ["class": "\($0.id)-only"] } ?? [:]
-            )
+            code(class: languageFilter.map { "\($0.id)-only" }, contents: [.text(fragments.map(\.text).joined())])
         }
     }
 }

@@ -1,20 +1,12 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2025-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
  See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
-
-#if canImport(FoundationXML)
-// TODO: Consider other HTML rendering options as a future improvement (rdar://165755530)
-import FoundationXML
-import FoundationEssentials
-#else
-import Foundation
-#endif
 
 import Testing
 @testable import DocCHTML
@@ -24,49 +16,49 @@ struct WordBreakTests {
     func insertsWordBreaks() {
         assertWordBreaks(for: "doSomething<Generic>(withFirst:andSecond:)", matches: """
         do
-        <wbr/>
+        <wbr>
         Something&lt;
-        <wbr/>
-        Generic&gt;(
-        <wbr/>
+        <wbr>
+        Generic>(
+        <wbr>
         with
-        <wbr/>
+        <wbr>
         First:
-        <wbr/>
+        <wbr>
         and
-        <wbr/>
+        <wbr>
         Second:)
         """)
         
         assertWordBreaks(for: "doSomethingWithFirst:andSecond:", matches: """
         do
-        <wbr/>
+        <wbr>
         Something
-        <wbr/>
+        <wbr>
         With
-        <wbr/>
+        <wbr>
         First:
-        <wbr/>
+        <wbr>
         and
-        <wbr/>
+        <wbr>
         Second:
         """)
         
         assertWordBreaks(for: "SomeVeryLongClassName", matches: """
         Some
-        <wbr/>
+        <wbr>
         Very
-        <wbr/>
+        <wbr>
         Long
-        <wbr/>
+        <wbr>
         Class
-        <wbr/>
+        <wbr>
         Name
         """)
         
         assertWordBreaks(for: "TLASomeClass", matches: """
         TLASome
-        <wbr/>
+        <wbr>
         Class
         """)
     }
@@ -78,7 +70,7 @@ struct WordBreakTests {
         line: UInt = #line
     ) {
         let withWordBreaks = RenderHelpers.wordBreak(symbolName: symbolName)
-            .map { $0.xmlString(options: [.nodePrettyPrint, .nodeCompactEmptyElement] )}
+            .map { String(decoding: HTMLFormatter.format(inPageElement: $0, options: .prettyPrint), as: UTF8.self) }
             .joined(separator: "\n")
         
         #expect(withWordBreaks == expectedHTML, sourceLocation: sourceLocation)
