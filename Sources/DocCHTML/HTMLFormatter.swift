@@ -1,0 +1,383 @@
+/*
+ This source file is part of the Swift.org open source project
+
+ Copyright (c) 2026 Apple Inc. and the Swift project authors
+ Licensed under Apache License v2.0 with Runtime Library Exception
+
+ See https://swift.org/LICENSE.txt for license information
+ See https://swift.org/CONTRIBUTORS.txt for Swift project authors
+*/
+
+package import struct Foundation.Data // Used as a return value by the formatter
+
+/// A type that formats an hierarchy of HTML nodes into serialized HTML 5 data.
+/// 
+/// ## Topics
+/// 
+/// ### Formatting
+/// - ``format(document:options:)``
+/// - ``format(inPageElement:options:)
+/// 
+/// ### Customizing the output
+/// - ``Options``
+package struct HTMLFormatter {
+    /// The byte buffer that the formatter modifies as it formats the given HTML.
+    private var buffer: [UInt8]
+    /// Options that customizes aspects of the formatter's output.
+    private let options: Options
+    
+    /// Options that customizes aspects of the formatter's output.
+    package struct Options: OptionSet {
+        package let rawValue: Int
+        package init(rawValue: Int) {
+            self.rawValue = rawValue
+        }
+        
+        /// Configures the formatter to "pretty print" the HTML hierarchy;
+        package static let prettyPrint = Self(rawValue: 1 << 0)
+        
+        /// Configures the formatter to omit quotes around attribute values that don't need to be quoted according to the HTML specification.
+        package static let omitOptionalQuotesAroundAttributeValues = Self(rawValue: 1 << 1)
+        
+        /// Configures the formatter to omit end tags for elements and situations where the end of the tag can be inferred from what comes after, according to the HTML specification.
+        package static let omitOptionalEndTags = Self(rawValue: 1 << 2)
+    }
+    
+    /// Formats a `<html>` element
+    /// - Parameters:
+    ///   - document: The HTML node that the formatter should format.
+    ///   - options: Options for how the formatter should format the serialized data.
+    /// - Returns: The serialized HTML 5 data.
+    package static func format(_ node: HTMLNode, options: Options = []) -> Data {
+        var encoder = Self(options: options)
+        
+        if node._tag == .html {
+            // Include the document type when encoding a full page.
+            encoder._append("<!DOCTYPE html>\n")
+        }
+        
+        if node._tag == .pre {
+            // Whitespace is significant for `<pre>` elements; so format that sub-hierarchy _without_ pretty printing.
+            encoder._compactFormat(node, nextElementTag: nil)
+        } else if options.contains(.prettyPrint) {
+            encoder._prettyFormat(node, state: .init())
+        } else {
+            encoder._compactFormat(node, nextElementTag: nil)
+        }
+        
+        return Data(encoder.buffer)
+    }
+    
+    private init(initialCapacity: Int = 512 * 2, options: Options) {
+        self.buffer = [UInt8]()
+        self.buffer.reserveCapacity(initialCapacity)
+        self.options = options
+    }
+    
+    // MARK: Compact formatting
+    
+    /// Compactly formats the given HTML element hierarchy.
+    /// - Parameters:
+    ///   - element: The HTML element to format compactly.
+    ///   - nextElementTag: The tag of the next element in the element's container, or `nil` if there are no more elements in the element's container.
+    private mutating func _compactFormat(_ element: consuming HTMLNode, nextElementTag: HTMLNode._Tag?) {
+        switch element._storage {
+        case .text(let text):
+            _format(text: consume text)
+            
+        case .element(let tag, let attributes, let contents):
+            // Start tag
+            let shouldSelfClose = contents.isEmpty
+            _formatStartTag(tag, attributes: attributes, selfClosing: shouldSelfClose)
+            guard !shouldSelfClose else {
+                // Don't create an end tag if the start tag was already self-closing.
+                return
+            }
+            
+            // Contents
+            for index in contents.indices {
+                let node = contents[index]
+                
+                let nextIndex = index &+ 1
+                _compactFormat(node, nextElementTag: nextIndex < contents.endIndex ? contents[nextIndex]._tag : nil)
+            }
+                
+            // End tag
+            if options.contains(.omitOptionalEndTags), tag.canOmitEndTag(whenFollowedBy: nextElementTag) {
+                return
+            }
+            _formatEndTag(tag)
+            
+        case .voidElement(let tag, let attributes):
+            _format(voidElement: tag, attributes: attributes)
+        }
+    }
+    
+    // MARK: Pretty print formatting
+    
+    /// Common indentation data, allocated once.
+    private static let _indentationData: [UInt8] = {
+        // Stop indenting further after 64 levels of indentation
+        var data = [UInt8](repeating: .init(ascii: " "), count: 128)
+        data[0] = .init(ascii: "\n")
+        return data
+    }()
+    
+    ///
+    private struct PrettyPrintingState: ~Copyable {
+        /// The current depth in the HTML element hierarchy.
+        var depth: UInt8 = 0
+        /// A Boolean value that s `true` if the formatter should place the element on the current line or `false` if the formatter should place the element on a new line.
+        var presentOnCurrentLine: Bool = true
+        /// The tag of the next element in the element's container, or `nil` if there are no more elements in the element's container.
+        var nextElementTag: HTMLNode._Tag? = nil
+    }
+    
+    /// Compactly formats the given HTML element hierarchy.
+    /// - Parameters:
+    ///   - element: The HTML element to format compactly.
+    ///   - nextElementTag: The tag of the next element in the element's container, or `nil` if there are no more elements in the element's container.
+    private mutating func _prettyFormat(_ element: HTMLNode, state: consuming PrettyPrintingState) {
+        func appendLineBreakAndIndentation(depth: UInt8 = state.depth) {
+            Self._indentationData.withUnsafeBufferPointer {
+                buffer.append(contentsOf: $0.prefix(1 /* the newline */ &+ Int(depth) &* 2 /* two spaces per indentation level */))
+            }
+        }
+        
+        if !state.presentOnCurrentLine {
+            appendLineBreakAndIndentation()
+        }
+        
+        switch element._storage {
+        case .text(let text):
+            _format(text: consume text)
+            
+        case .element(let tag, let attributes, let contents):
+            // Start tag
+            let shouldSelfClose = contents.isEmpty
+            _formatStartTag(tag, attributes: attributes, selfClosing: shouldSelfClose)
+            guard !shouldSelfClose else {
+                // Don't create an end tag if the start tag was already self-closing.
+                return
+            }
+            
+            // It's a matter of opinion how to "pretty print" HTML.
+            let presentContentsOnSameLine = tag != .picture && /*attributes.isEmpty &&*/ !contents.contains(where: \._isElement)
+            var childState = PrettyPrintingState(depth: state.depth &+ 1, presentOnCurrentLine: presentContentsOnSameLine, nextElementTag: nil)
+            
+            for index in contents.indices {
+                let child = contents[index]
+                let nextIndex = index &+ 1
+                // It's necessary to know what element comes next in the container (if any) to determine when it's allowed to omit the end tag.
+                childState.nextElementTag = nextIndex < contents.endIndex ? contents[nextIndex]._tag : nil
+                
+                // Whitespace is significant inside `<pre>` elements; so we switch to formatting that sub-hierarchy _without_ pretty printing.
+                if child._tag == .pre {
+                    // However, first we add a new line and indentation so that the `<pre>` element starts appropriately indented on a new line.
+                    appendLineBreakAndIndentation(depth: childState.depth)
+                    _compactFormat(child, nextElementTag: childState.nextElementTag)
+                } else {
+                    _prettyFormat(child, state: childState)
+                }
+            }
+            
+            // End tag
+            if options.contains(.omitOptionalEndTags), tag.canOmitEndTag(whenFollowedBy: state.nextElementTag) {
+                return
+            }
+            if !presentContentsOnSameLine {
+                appendLineBreakAndIndentation()
+            }
+            _formatEndTag(tag)
+            
+        case .voidElement(let voidTag, let attributes):
+            _format(voidElement: voidTag, attributes: consume attributes)
+        }
+    }
+    
+    private mutating func _append(_ string: StaticString) {
+        string.withUTF8Buffer { buffer.append(contentsOf: $0) }
+    }
+    
+    private mutating func _format(text: consuming String) {
+        // This can be made nicer with UTF8Span when we can require anyAppleOS 26+
+        var text = consume text
+        text.withUTF8 {
+            var remaining = $0[...]
+            
+            // Escape any characters that need to be escaped inside of text.
+            while let index = remaining.firstIndex(where: \.needsEscapingInHTMLText) {
+                // Append the text as-is up to the character that needs to be escaped.
+                buffer.append(contentsOf: remaining[..<index])
+                // There are only two characters that need to be escaped inside of text.
+                _append(remaining[index] == .init(ascii: "&") ? "&amp;" : "&lt;")
+                
+                remaining = remaining[remaining.index(after: index)...]
+            }
+            
+            buffer.append(contentsOf: remaining)
+        }
+    }
+    
+    private mutating func _formatStartTag(_ tag: HTMLNode._Tag, attributes: consuming HTMLNode._Attributes, selfClosing: Bool) {
+        buffer.append(.init(ascii: "<"))
+        _append(tag.name)
+        _format(attributes: consume attributes)
+        
+        if selfClosing {
+            _append("/>")
+        } else {
+            buffer.append(.init(ascii: ">"))
+        }
+    }
+    
+    private mutating func _formatEndTag(_ tag: HTMLNode._Tag) {
+        _append("</")
+        _append(tag.name)
+        buffer.append(.init(ascii: ">"))
+    }
+    
+    private mutating func _format(voidElement tag: HTMLNode._Tag, attributes: consuming HTMLNode._Attributes) {
+        buffer.append(.init(ascii: "<"))
+        _append(tag.name)
+        _format(attributes: consume attributes)
+        buffer.append(.init(ascii: ">"))
+    }
+    
+    private mutating func _format(attributes: HTMLNode._Attributes) {
+        func _format(value: consuming String) {
+            // This can be made nicer with UTF8Span when we can require anyAppleOS 26+
+            var value = consume value
+            value.withUTF8 {
+                var remaining = $0[...]
+                
+                // If the formatter is configured to omit optional quotes around attribute values; check if this value _needs_ to be quoted.
+                guard !options.contains(.omitOptionalQuotesAroundAttributeValues) || remaining.contains(where: \.needsQuotingInHTMLAttribute) else {
+                    buffer.append(.init(ascii: "="))
+                    // If the value doesn't need quoting, the only escapable character is `&`.
+                    while let index = remaining.firstIndex(of: .init(ascii: "&")) {
+                        buffer.append(contentsOf: remaining[..<index])
+                        _append("&amp;")
+                        remaining = remaining[remaining.index(after: index)...]
+                    }
+                    buffer.append(contentsOf: remaining)
+                    return
+                }
+                
+                // Quote this attribute
+                _append("=\"")
+                defer {
+                    buffer.append(.init(ascii: "\""))
+                }
+                
+                while let index = remaining.firstIndex(where: \.needsEscapingInHTMLAttribute) {
+                    // Append the text as-is up to the character that needs to be escaped.
+                    buffer.append(contentsOf: remaining[..<index])
+                    // Because the formatter uses `"` to quote attribute values; it only need to escape `&` and `"` in the value.
+                    _append(remaining[index] == .init(ascii: "&") ? "&amp;" : "&quot;")
+                    
+                    remaining = remaining[remaining.index(after: index)...]
+                }
+                buffer.append(contentsOf: remaining)
+            }
+        }
+        
+        // Regardless of pretty printing or not, sort the attributes by their key so that the output is stable across different program executions.
+        for (var name, value) in attributes.sorted(by: { $0.key < $1.key }) {
+            buffer.append(.init(ascii: " "))
+            name.withUTF8 {
+                buffer.append(contentsOf: $0)
+            }
+            guard !value.isEmpty else { continue }
+            _format(value: consume value)
+        }
+    }
+}
+
+private extension UTF8.CodeUnit {
+    var needsEscapingInHTMLText: Bool {
+        return self == .init(ascii: "&")
+            || self == .init(ascii: "<")
+    }
+    var needsEscapingInHTMLAttribute: Bool {
+        return self == .init(ascii: "&")
+            || self == .init(ascii: "\"") // Because the formatter uses `"` to quote the attribute value, we don't need to escape `'`.
+    }
+    /// A Boolean value that determines whether this UTF-8 code unit
+    ///
+    /// An attribute value can remain unquoted if it doesn't contain ASCII whitespace or any of " ' ` = < >
+    var needsQuotingInHTMLAttribute: Bool {
+        return self == .init(ascii: " " )
+            || self == .init(ascii: "\t") // Tab
+            || self == .init(ascii: "\n") // New line / Line feed
+            || self == .init(ascii: "\r") // Carriage return
+            || self == .init(ascii: "\"")
+            || self == .init(ascii: "'" )
+            || self == .init(ascii: "`" )
+            || self == .init(ascii: "=" )
+            || self == .init(ascii: "<" )
+            || self == .init(ascii: ">" )
+    }
+}
+
+private extension HTMLNode._Tag {
+    // FIXME: USE THIS!
+    var canPrettyPrintInline: Bool {
+        // Our pretty printer can include any "text-level semantic" tag inline
+        Self.a.rawValue <= self.rawValue && self.rawValue <= Self.wbr.rawValue
+    }
+    
+    /// Determines whether or not an element of this tag can omit its end tag when followed by the given `next` element in the same container.
+    ///
+    /// The HTML specific
+    func canOmitEndTag(whenFollowedBy next: Self?) -> Bool {
+        switch self {
+        case .p:
+            switch next {
+            case .address, .article, .aside, .blockquote, .details, .dialog, .div, .dl, .fieldset, .figcaption, .figure, .footer, .form, .h1, .h2, .h3, .h4, .h5, .h6, .hgroup, .hr, .main, .menu, .nav, .ol, .p, .pre, .search, .section, .table, .ul, nil:
+                true
+            default:
+                false
+            }
+            
+        case .body:
+            true
+            
+        case .li:
+            next == .li || next == nil
+            
+        case .dt:
+            next == .dt || next == .dd
+            
+        case .dd:
+            next == .dt || next == .dd || next == nil
+            
+        case .rt, .rp:
+            next == .rt || next == .rp || next == nil
+            
+        case .caption:
+            true
+
+        case .thead:
+            next == .tbody || next == .tfoot
+            
+        case .tfoot:
+            next == nil
+            
+        case .tr:
+            next == .td || next == nil
+            
+        case .td, .th:
+            next == .td || next == .th || next == nil
+            
+        case .optgroup:
+            next == .optgroup || next == .hr || next == nil
+            
+        case .option:
+            next == .option || next == .optgroup || next == .hr || next == nil
+            
+        default:
+            false
+        }
+    }
+}

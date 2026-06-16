@@ -25,11 +25,9 @@ struct HTMLRenderFullPageTests {
     
     @Test
     func includesMainContentInFullPage() async throws {
-        let mainContent = XMLNode.element(named: "article", children: [
-            .element(named: "p", children: [
-                .text("Some documentation")
-            ])
-        ])
+        let mainContent = DocCHTML.article {
+            p { "Some documentation" }
+        }
         
         let fullPage = HTMLRenderer.makeFullPage(
             mainContent: mainContent,
@@ -87,11 +85,9 @@ struct HTMLRenderFullPageTests {
         
         // Render the page a few times in parallel to verify that the custom header/footer nodes can be "reused".
         [1,2,3].concurrentPerform { _ in    
-            let mainContent = XMLNode.element(named: "article", children: [
-                .element(named: "p", children: [
-                    .text("Some documentation")
-                ])
-            ])
+            let mainContent = DocCHTML.article {
+                p { "Some documentation" }
+            }
             
             let fullPage = HTMLRenderer.makeFullPage(
                 mainContent: mainContent,
@@ -144,7 +140,7 @@ struct HTMLRenderFullPageTests {
 }
 
 // This workaround is modified from the similar code in FileWritingHTMLContentConsumerTests.swift
-func assert(_ html: XMLDocument, matches expectedHTML: String, sourceLocation: SourceLocation = #_sourceLocation) {
+func assert(_ html: HTMLNode, matches expectedHTML: String, sourceLocation: SourceLocation = #_sourceLocation) {
     // XMLNode on macOS and Linux pretty print with different indentation.
     // To compare the XML structure without getting false positive failures because of indentation and other formatting differences,
     // we explicitly process each string into an easy-to-compare format.
@@ -170,6 +166,6 @@ func assert(_ html: XMLDocument, matches expectedHTML: String, sourceLocation: S
             .replacingOccurrences(of: #"="""#, with: "")
     }
     
-    let actualHTML: String = html.xmlString(options: .nodeCompactEmptyElement)
+    let actualHTML = String(decoding: HTMLFormatter.format(document: html, options: .prettyPrint), as: UTF8.self)
     #expect(formatForTestComparison(actualHTML) == formatForTestComparison(expectedHTML), sourceLocation: sourceLocation)
 }
