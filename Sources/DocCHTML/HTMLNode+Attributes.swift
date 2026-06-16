@@ -19,7 +19,7 @@ extension HTMLNode {
         /// An hint for autocapitalization behavior of the element.
         case autoCapitalize(AutoCapitalize)
         /// The autocorrection behavior for the element.
-        case autoCorrect(AutoCorrect)
+        case autoCorrect(Bool)
         /// An indication that browser it to focus the element as soon as the page is loaded, allowing the user to just start typing without having to manually focus the element.
         case autoFocus
         /// A list of classes for the element.
@@ -29,9 +29,9 @@ extension HTMLNode {
         /// The text direction of the element.
         case dir(Dir)
         /// A configuration that controls whether or not the element is draggable.
-        case draggable(Draggable)
+        case draggable(Bool)
         /// A configuration of what action label (or icon) the browser should present for the "enter key" on virtual keyboards.
-        case enterKeyHint
+        case enterKeyHint(EnterKeyHint)
         /// An offset for the heading levels of descendants of the element.
         ///
         /// According to the HTML specification, the value must be a valid non-negative integer between 0 and 8, inclusive.
@@ -51,7 +51,7 @@ extension HTMLNode {
         /// The language that a non-editable element is in, or the language that an editable element should be written in by the user.
         ///
         /// According to the HTML specification, the attribute should contain a valid BCP 47 language tag.
-        case lang
+        case lang(String)
         /// A cryptographic nonce ("number used once") which can be used by Content Security Policy to determine whether or not a given fetch will be allowed to proceed.
         case nonce(String)
         /// Designates the element as a "popover" that is hidden until it opened via an invoking element.
@@ -61,7 +61,7 @@ extension HTMLNode {
         // We're excluding the `slot` attribute for the shadow DOM.
         
         /// A configuration that controls whether or not the element is spellchecked.
-        case spellcheck(Spellcheck)
+        case spellcheck(Bool)
         // We're excluding the `style` attribute for inline CSS.
         
         /// A configuration that controls whether or not the element is sequentially focusable and determines its relative oder in the sequential navigation.
@@ -72,9 +72,9 @@ extension HTMLNode {
         /// Advisory information for the element, such as would be appropriate for a tooltip.
         case title(String)
         /// A configuration that controls whether the element's text is to be translated when the page is localized, or whether to leave them unchanged.
-        case translate(Translate)
+        case translate(Bool)
         /// A configuration that controls whether the browser should offer writing suggestions for this element.
-        case writingSuggestions(WritingSuggestions)
+        case writingSuggestions(Bool)
         
         /// A value for the ``HTMLNode/Attribute/autocapitalize(_:)`` attribute.
         package enum AutoCapitalize: String {
@@ -86,14 +86,6 @@ extension HTMLNode {
             case words
             /// All letters should default to uppercase.
             case characters
-        }
-        
-        /// A value for the ``HTMLNode/Attribute/autocorrect(_:)`` attribute.
-        package enum AutoCorrect: String {
-            /// The browser is permitted to automatically correct spelling errors while the user types.
-            case on
-            /// The browser is not allowed to automatically correct spelling while the user types.
-            case off
         }
         
         /// A value for the ``HTMLNode/Attribute/contentEditable(_:)`` attribute.
@@ -114,14 +106,6 @@ extension HTMLNode {
             case rtl
             /// The contents of the element are explicitly directionally isolated text, but the direction is to be determined programmatically using the contents of the element.
             case auto
-        }
-        
-        /// A value for the ``HTMLNode/Attribute/draggable(_:)`` attribute.
-        package enum Draggable: String {
-            /// The element is draggable.
-            case `true`
-            /// The element is not draggable.
-            case `false`
         }
         
         /// A value for the ``HTMLNode/Attribute/enterKeyHint(_:)`` attribute.
@@ -147,7 +131,7 @@ extension HTMLNode {
             /// The element is will not be rendered
             ///
             /// Can either be represented as an explicit "hidden" value or as an empty value.
-            case hidden
+            case hidden     = ""
             /// The element is will not be rendered, but content inside will be accessible to find-in-page and fragment navigation.
             case untilFound = "until-found"
         }
@@ -263,30 +247,6 @@ extension HTMLNode {
             case dialog
         }
         
-        /// A value for the ``HTMLNode/Attribute/spellcheck(_:)`` attribute.
-        package enum Spellcheck: String {
-            /// Spelling and grammar will be checked.
-            case `true`
-            /// Spelling and grammar will not be checked.
-            case `false`
-        }
-        
-        /// A value for the ``HTMLNode/Attribute/translate(_:)`` attribute.
-        package enum Translate: String {
-            /// Translate the element's text when the page is localized.
-            case yes
-            /// Leave the element's text unchanged when the page is localized.
-            case no
-        }
-        
-        /// A value for the ``HTMLNode/Attribute/writingSuggestions(_:)`` attribute.
-        package enum WritingSuggestions: String {
-            /// Offer writing suggestions for this element.
-            case `true`
-            /// Don't offer writing suggestions for this element.
-            case `false`
-        }
-        
         // MARK: Meta attributes
         
         /// Declares the document's character encoding to be UTF-8; which  is the only valid encoding for HTML5 documents.
@@ -306,9 +266,10 @@ extension HTMLNode {
         case hrefLang(String)
         /// How much information the browser should send in a referrer header when following the link.
         case referrerPolicy(ReferrerPolicy)
-        /// The tionship of the linked URL as space-separated link types.
-        case rel([String])
+        /// A list of the types of that the linked URL ...
+        case rel([LinkType])
 
+        
         
         /// A value for the ``HTMLNode/Attribute/referrerPolicy(_:)`` attribute.
         package enum ReferrerPolicy: String {
@@ -330,6 +291,91 @@ extension HTMLNode {
             
             @available(*, deprecated, message: "This policy is unsafe because it leaks origins and paths from TLS-protected resources to insecure origins.")
             case unsafeURL = "unsafe-url"
+        }
+        
+        package enum LinkType: String {
+            case fixme
+        }
+    }
+}
+
+extension HTMLNode.Attribute {
+    var name: StaticString {
+        switch self {
+            case .accessKey:          "accesskey"
+            case .autoCapitalize:     "autocapitalize"
+            case .autoCorrect:        "autocorrect"
+            case .autoFocus:          "autofocus"
+            case .class:              "class"
+            case .contentEditable:    "contenteditable"
+            case .dir:                "dir"
+            case .draggable:          "draggable"
+            case .enterKeyHint:       "enterkeyhint"
+            case .headingOffset:      "headingoffset"
+            case .headingReset:       "headingreset"
+            case .hidden:             "hidden"
+            case .inert:              "inert"
+            case .inputMode:          "inputmode"
+            case .lang:               "lang"
+            case .nonce:              "nonce"
+            case .popover:            "popover"
+            case .role:               "role"
+            case .spellcheck:         "spellcheck"
+            case .tabIndex:           "tabindex"
+            case .title:              "title"
+            case .translate:          "translate"
+            case .writingSuggestions: "writingsuggestions"
+            case .utf8CharSet:        "charset"
+            case .name:               "name"
+            case .contents:           "contents"
+            case .download:           "download"
+            case .href:               "href"
+            case .hrefLang:           "hreflang"
+            case .referrerPolicy:     "referrerpolicy"
+            case .rel:                "rel"
+        }
+    }
+    
+    var value: String {
+        switch self {
+            // Global attributes
+            case .accessKey(let keys):             keys.map { String(Character($0)) }.joined(separator: " ")
+            case .autoCapitalize(let value):       value.rawValue
+            case .autoCorrect(let enabled):        enabled ? "on" : "off"
+            case .autoFocus:                       "" // A "boolean" attribute
+            case .class(let classNames):           classNames.joined(separator: " ")
+            case .contentEditable(let value):      value.rawValue
+            case .dir(let value):                  value.rawValue
+            case .draggable(let enabled):          enabled ? "true" : "false"
+            case .enterKeyHint(let value):         value.rawValue
+            case .headingOffset(let number):       min(0, max(8, number)).description
+            case .headingReset:                    "" // A "boolean" attribute
+            case .hidden(let value):               value.rawValue
+            case .inert:                           "" // A "boolean" attribute
+            case .inputMode(let value):            value.rawValue
+            case .lang(let string):                string
+            case .nonce(let string):               string
+            case .popover:                         "" // A "boolean" attribute
+            case .role(let value):                 value.rawValue
+            case .spellcheck(let enabled):         enabled ? "true" : "false"
+            case .tabIndex(let number):            number.description
+            case .title(let string):               string
+            case .translate(let enabled):          enabled ? "yes" : "no"
+            case .writingSuggestions(let enabled): enabled ? "true" : "false"
+                
+            // Meta attributes
+            case .utf8CharSet:                     "utf-8" // There's only one valid HTML 5 character encoding.
+            case .name(let string):                string
+            case .contents(let string):            string
+            
+            // Element-specific attributes
+            case .download:                        "" // A "boolean" attribute
+            case .href(let string):                string
+            case .hrefLang(let string):            string
+            case .referrerPolicy(let value):       value.rawValue
+            case .rel(let values):                 values.map(\.rawValue).joined(separator: " ")
+            
+            
         }
     }
 }
