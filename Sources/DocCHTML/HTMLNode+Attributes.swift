@@ -47,7 +47,7 @@ extension HTMLNode {
         case inputMode(InputMode)
         // We're excluding the `is` attribute for custom HTML elements.
         // We're excluding the various `item...` attributes for HTML "items".
-      
+        
         /// The language that a non-editable element is in, or the language that an editable element should be written in by the user.
         ///
         /// According to the HTML specification, the attribute should contain a valid BCP 47 language tag.
@@ -286,9 +286,50 @@ extension HTMLNode {
             /// Don't offer writing suggestions for this element.
             case `false`
         }
-    }
-    
-    package enum MetaNameAttributes {
         
+        // MARK: Meta attributes
+        
+        /// Declares the document's character encoding to be UTF-8; which  is the only valid encoding for HTML5 documents.
+        case utf8CharSet
+        
+        
+        case name(String)
+        case contents(String)
+        
+        // MARK: Element-specific attributes
+        
+        /// Configures the browser to tread `<a>` element's linked URL as a download.
+        case download
+        /// The URL that the `<a>` element links to.
+        case href(String)
+        /// A hint at the human language of the linked URL
+        case hrefLang(String)
+        /// How much information the browser should send in a referrer header when following the link.
+        case referrerPolicy(ReferrerPolicy)
+        /// The tionship of the linked URL as space-separated link types.
+        case rel([String])
+
+        
+        /// A value for the ``HTMLNode/Attribute/referrerPolicy(_:)`` attribute.
+        package enum ReferrerPolicy: String {
+            /// The browser should not send a referrer header.
+            case noReferrer = "no-referrer"
+            /// The browser should not send a referrer header. to origins without TLS (HTTPS).
+            case noReferrerWhenDowngrade = "no-referrer-when-downgrade"
+            /// The browser should limit the referrer information to the origin of the referring page: its scheme, host, and port.
+            case origin
+            /// The browser should limit the referrer information to the origin of the referring page: its scheme, host, and port. Navigations on the same origin should still include the path.
+            case originWhenCrossOrigin = "origin-when-cross-origin"
+            /// The browser should send referred information for the same origin, but cross-origin requests should contain no referrer information.
+            case sameOrigin = "same-origin"
+            // Only send the origin of the document as the referrer when the protocol security level stays the same (HTTPS→HTTPS), but don't send it to a less secure destination (HTTPS→HTTP).
+            
+            case strictOrigin = "strict-origin"
+            // Send a full URL when performing a same-origin request, only send the origin when the protocol security level stays the same (HTTPS→HTTPS), and send no header to a less secure destination (HTTPS→HTTP).
+            case strictOriginWhenCrossOrigin = "strict-origin-when-cross-origin"
+            
+            @available(*, deprecated, message: "This policy is unsafe because it leaks origins and paths from TLS-protected resources to insecure origins.")
+            case unsafeURL = "unsafe-url"
+        }
     }
 }
