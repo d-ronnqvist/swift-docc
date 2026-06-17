@@ -547,9 +547,9 @@ struct MarkdownOutputTests {
                 
                 ## Overview
                 
-                ![Alternative Title](image.png)
+                ![Alternative Title](image.png "first alt")
                 ![](image.png)
-                ![Web Image](https://www.example.com/webimage.png)
+                ![Web Image](https://www.example.com/webimage.png "second alt")
                 ![Unresolved Image](unresolved.png)
                 """),
             Folder(name: "Resources", content: [

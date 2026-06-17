@@ -289,7 +289,7 @@ package struct HTMLFormatter {
     }
     
     /// Format's a start tag and its attributes---for example `<nav id="breadcrumbs">`---and appends it to the formatter's buffer.
-    private mutating func _formatStartTag(_ tag: HTMLNode._Tag, attributes: consuming HTMLNode._Attributes, selfClosing: Bool) {
+    private mutating func _formatStartTag(_ tag: HTMLNode._Tag, attributes: consuming [HTMLNode.Attribute], selfClosing: Bool) {
         buffer.append(.init(ascii: "<"))
         _append(tag.name)
         _format(attributes: consume attributes)
@@ -309,7 +309,7 @@ package struct HTMLFormatter {
     }
     
     /// Format's a void tag---for example `<hr>`---and appends it to the formatter's buffer.
-    private mutating func _format(voidElement tag: HTMLNode._Tag, attributes: consuming HTMLNode._Attributes) {
+    private mutating func _format(voidElement tag: HTMLNode._Tag, attributes: consuming [HTMLNode.Attribute]) {
         buffer.append(.init(ascii: "<"))
         _append(tag.name)
         _format(attributes: consume attributes)
@@ -317,10 +317,14 @@ package struct HTMLFormatter {
     }
     
     /// Format's a list of attributes---for example `id=something class="one two"`---and appends it to the formatter's buffer.
-    private mutating func _format(attributes: HTMLNode._Attributes) {
-        func _format(value: consuming String) {
-            // This can be made nicer with UTF8Span when we can require anyAppleOS 26+
-            var value = consume value
+    private mutating func _format(attributes: [HTMLNode.Attribute]) {
+        for attribute in attributes {
+            buffer.append(.init(ascii: " "))
+            _append(attribute.nameForFormatting)
+            
+            var value = attribute.value
+            guard !value.isEmpty else { continue }
+            
             value.withUTF8 {
                 var remaining = $0[...]
                 
@@ -353,16 +357,6 @@ package struct HTMLFormatter {
                 }
                 buffer.append(contentsOf: remaining)
             }
-        }
-        
-        // Regardless of pretty printing or not, sort the attributes by their key so that the output is stable across different program executions.
-        for (var name, value) in attributes.sorted(by: { $0.key < $1.key }) {
-            buffer.append(.init(ascii: " "))
-            name.withUTF8 {
-                buffer.append(contentsOf: $0)
-            }
-            guard !value.isEmpty else { continue }
-            _format(value: consume value)
         }
     }
 }

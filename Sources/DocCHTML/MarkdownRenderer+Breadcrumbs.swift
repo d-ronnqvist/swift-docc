@@ -35,7 +35,7 @@ package extension MarkdownRenderer {
                     } else {
                         names.map { language, name in
                             // Wrap the name in a span so that it can be given a language specific "class" attribute.
-                            span(class: "\(language.id)-only", contents: [.text(name)])
+                            span([.class("\(language.id)-only")], contents: [.text(name)])
                         }
                     }
                 case .conciseness:
@@ -49,7 +49,7 @@ package extension MarkdownRenderer {
         var items: [HTMLNode] = references.compactMap {
             linkProvider.element(for: $0).map { page in
                 li(contents: [
-                    a(href: self.path(to: page.path), contents: nameElements(for: page.names))
+                    a([.href(path(to: page.path))], contents: nameElements(for: page.names))
                 ])
             }
         }
@@ -62,7 +62,7 @@ package extension MarkdownRenderer {
         
         return switch goal {
         case .conciseness: list // If the goal is conciseness, don't wrap the list in a `<nav>` HTML element with an "id".
-        case .richness:    nav(id: "breadcrumbs", contents: [list])
+        case .richness:    nav(/*id: "breadcrumbs", */contents: [list])
         }
     }
 }

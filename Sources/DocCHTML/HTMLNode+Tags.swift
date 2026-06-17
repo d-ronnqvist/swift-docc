@@ -88,7 +88,6 @@ package struct HTMLBuilder {
     }
 }
 
-
 // MARK: Tags
 
 // This only defined functions for the HTML elements that we've needed to create so far,
@@ -96,8 +95,8 @@ package struct HTMLBuilder {
 // If you need another element you can add a new function here, following the style of the other functions.
 // If you need to pass new information to an existing element you can add a new parameter with a default value to that element's corresponding function.
 
-package func html(lang: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    ._element(.html, attributes: lang.map { ["lang": $0] } ?? [:] , contents: contents())
+package func html(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.html, attributes: consume attributes , contents: contents())
 }
 
 // MARK Metadata
@@ -110,11 +109,11 @@ package func title(_ title: consuming String) -> HTMLNode {
     ._element(.title, contents: [.text(consume title)])
 }
 
-package func link(rel: consuming String, href: consuming String) -> HTMLNode {
-    ._voidElement(.link, attributes: ["rel": rel, "href": href])
+package func link(_ attributes: HTMLNode.Attribute...) -> HTMLNode {
+    ._voidElement(.link, attributes: consume attributes)
 }
 
-package func meta(attributes: consuming [String: String]) -> HTMLNode {
+package func meta(_ attributes: HTMLNode.Attribute...) -> HTMLNode {
     ._voidElement(.meta, attributes: consume attributes)
 }
 
@@ -124,144 +123,139 @@ package func body(@HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
     ._element(.body, contents: contents())
 }
 
-package func article(@HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    article(contents: contents())
+package func article(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.article, attributes: attributes, contents: contents())
 }
-package func article(contents: [HTMLNode]) -> HTMLNode {
-    ._element(.article, contents: contents)
-}
-
-package func section(id: consuming String? = nil, class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    section(id: id, class: classNames, contents: contents())
-}
-func section(id: consuming String? = nil, class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.section, attributes: makeAttributes(id: id, class: classNames), contents: contents)
+package func article(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.article, attributes: attributes, contents: contents)
 }
 
-package func nav(id: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    nav(id: id, contents: contents())
+package func section(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.section, attributes: attributes, contents: contents())
 }
-func nav(id: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.nav, attributes: id.map { ["id": $0] } ?? [:], contents: contents)
-}
-
-package func aside(class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    aside(class: classNames, contents: contents())
-}
-package func aside(class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.aside, attributes: classNames.map { ["class": $0] } ?? [:], contents: contents)
+func section(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.section, attributes: attributes, contents: contents)
 }
 
-package func h1(id: consuming String? = nil, class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    ._element(.h1, attributes: classNames.map { ["class": $0] } ?? [:], contents: contents())
+package func nav(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.nav, attributes: attributes, contents: contents())
 }
-package func h1(id: consuming String? = nil, class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.h1, attributes: makeAttributes(id: id, class: classNames), contents: contents)
+func nav(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.nav, attributes: attributes, contents: contents)
+}
+
+package func aside(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.aside, attributes: attributes, contents: contents())
+}
+package func aside(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.aside, attributes: attributes, contents: contents)
+}
+
+package func h1(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.h1, attributes: attributes, contents: contents())
+}
+package func h1(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.h1, attributes: attributes, contents: contents)
 }
 
 package func h2(_ text: String) -> HTMLNode {
     ._element(.h2, contents: [.text(text)])
 }
-
-func h2(id: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.h2, attributes: id.map { ["id": $0] } ?? [:], contents: contents)
+package func h2(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.h2, attributes: attributes, contents: contents())
+}
+package func h2(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.h2, attributes: attributes, contents: contents)
 }
 
-func h3(id: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.h3, attributes: id.map { ["id": $0] } ?? [:], contents: contents)
+func heading(level: Int, _ attributes: HTMLNode.Attribute..., contents: [HTMLNode]) -> HTMLNode {
+    let tag: HTMLNode._Tag = switch level {
+        case 1:  .h1
+        case 2:  .h2
+        case 3:  .h3
+        case 4:  .h4
+        case 5:  .h5
+        default: .h6
+    }
+    return ._element(tag, attributes: attributes, contents: contents)
 }
 
-func h4(id: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.h4, attributes: id.map { ["id": $0] } ?? [:], contents: contents)
+
+package func hgroup(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.hgroup, attributes: attributes, contents: contents())
 }
 
-func h5(id: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.h5, attributes: id.map { ["id": $0] } ?? [:], contents: contents)
+package func header(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.header, attributes: attributes, contents: contents())
 }
 
-func h6(id: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.h6, attributes: id.map { ["id": $0] } ?? [:], contents: contents)
-}
-
-package func hgroup(@HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    ._element(.hgroup, contents: contents())
-}
-
-package func header(@HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    ._element(.header, contents: contents())
-}
-
-package func footer(@HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    ._element(.footer, contents: contents())
+package func footer(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.footer, attributes: attributes, contents: contents())
 }
 
 // Grouping
 
-package func p(id: consuming String? = nil, class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    p(id: id, class: classNames, contents: contents())
+package func p(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.p, attributes: attributes, contents: contents())
 }
-func p(id: consuming String? = nil, class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.p, attributes: makeAttributes(id: id, class: classNames), contents: contents)
-}
-
-package func pre(id: consuming String? = nil, class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    pre(id: id, class: classNames, contents: contents())
-}
-func pre(id: consuming String? = nil, class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.pre, attributes: makeAttributes(id: id, class: classNames), contents: contents)
+func p(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.p, attributes: attributes, contents: contents)
 }
 
-package func ol(class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    ol(class: classNames, contents: contents())
+package func pre(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.pre, attributes: attributes, contents: contents())
 }
-func ol(class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
+func pre(_ attributes: [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.pre, attributes: attributes, contents: contents)
+}
+
+package func ol(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ol(attributes, contents: contents())
+}
+func ol(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
     assert(contents.allSatisfy { $0._tag == .li }, "<ol> tags can only contain <li> tags")
-    return ._element(.ol, attributes: classNames.map { ["class": $0] } ?? [:], contents: contents)
+    return ._element(.ol, attributes: attributes, contents: contents)
 }
 
-package func ul(id: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    ul(id: id, contents: contents())
+package func ul(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ul(attributes, contents: contents())
 }
-func ul(id: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
+func ul(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
     assert(contents.allSatisfy { $0._tag == .li }, "<ul> tags can only contain <li> tags")
-    return ._element(.ul, attributes: id.map { ["id": $0] } ?? [:], contents: contents)
+    return ._element(.ul, attributes: attributes, contents: contents)
 }
 
-package func li(attributes: consuming [String: String] = [:], @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    li(attributes: attributes, contents: contents())
+package func li(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.li, attributes: attributes, contents: contents())
 }
-func li(attributes: consuming [String: String] = [:], contents: [HTMLNode]) -> HTMLNode {
-    ._element(.li, attributes: consume attributes, contents: contents)
+func li(attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.li, attributes: attributes, contents: contents)
 }
 
-package func dl(class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    dl(class: classNames, contents: contents())
+package func dl(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    dl(attributes, contents: contents())
 }
-func dl(class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
+func dl(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
     assert(contents.allSatisfy { $0._tag == .dt || $0._tag == .dd }, "<dl> tags can only contain <dt> and <dt> tags")
     return ._element(.dl, contents: contents)
 }
 
-func dt(class classNames: consuming String? = nil, _ text: consuming String) -> HTMLNode {
-    return ._element(.dt, attributes: classNames.map { ["class": $0] } ?? [:], contents: [.text(consume text)])
+func dt(_ attributes: HTMLNode.Attribute..., contents text: consuming String) -> HTMLNode {
+    ._element(.dt, attributes: attributes, contents: [.text(consume text)])
 }
 
-func dd(class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.dd, attributes: classNames.map { ["class": $0] } ?? [:], contents: contents)
+func dd(_ attributes: HTMLNode.Attribute..., contents: [HTMLNode]) -> HTMLNode {
+    ._element(.dd, attributes: attributes, contents: contents)
 }
 
 package let hr = HTMLNode._voidElement(.hr)
 
 // Text-level semantics
 
-package func a(href: consuming String, class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    a(href: href, contents: contents())
+package func a(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    a(attributes, contents: contents())
 }
-func a(href: consuming String, class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    var attributes = ["href": href]
-    if let classNames {
-        attributes["class"] = classNames
-    }
+func a(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
     return ._element(.a, attributes: attributes, contents: contents)
 }
 
@@ -269,11 +263,11 @@ func s(contents: [HTMLNode]) -> HTMLNode {
     ._element(.s, contents: contents)
 }
 
-package func code(class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    code(class: classNames, contents: contents())
+package func code(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    code(attributes, contents: contents())
 }
-func code(class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.code, attributes: classNames.map { ["class": $0] } ?? [:], contents: contents)
+func code(_ attributes: [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.code, attributes: attributes, contents: contents)
 }
 
 func i(contents: [HTMLNode]) -> HTMLNode {
@@ -284,11 +278,11 @@ func b(contents: [HTMLNode]) -> HTMLNode {
     ._element(.b, contents: contents)
 }
 
-package func span(class classNames: consuming String? = nil, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    span(class: classNames, contents: contents())
+package func span(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+    span(attributes, contents: contents())
 }
-func span(class classNames: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    ._element(.span, attributes: classNames.map { ["class": $0] } ?? [:], contents: contents)
+func span(_ attributes: consuming [HTMLNode.Attribute], contents: [HTMLNode]) -> HTMLNode {
+    ._element(.span, attributes: attributes, contents: contents)
 }
 
 package let br = HTMLNode._voidElement(.br)
@@ -297,18 +291,18 @@ package let wbr = HTMLNode._voidElement(.wbr)
 
 // Embedded
 
-package func picture(@HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
+package func picture(@HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
     picture(contents: contents())
 }
 func picture(contents: [HTMLNode]) -> HTMLNode {
     ._element(.picture, contents: contents)
 }
 
-func img(attributes: consuming [String: String]) -> HTMLNode {
+func img(attributes: consuming [HTMLNode.Attribute]) -> HTMLNode {
     ._voidElement(.img, attributes: consume attributes)
 }
 
-func source(attributes: consuming [String: String]) -> HTMLNode {
+func source(attributes: consuming [HTMLNode.Attribute]) -> HTMLNode {
     ._voidElement(.source, attributes: consume attributes)
 }
 
@@ -334,30 +328,30 @@ func tr(contents: [HTMLNode]) -> HTMLNode {
 }
 
 func th(colspan: UInt = 0, rowspan: UInt = 0, class className: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    var attributes = [String: String]()
-    if colspan > 1 {
-        attributes["colspan"] = colspan.description
-    }
-    if rowspan > 1 {
-        attributes["rowspan"] = rowspan.description
-    }
-    if let className {
-        attributes["class"] = consume className
-    }
+    var attributes = [HTMLNode.Attribute]()
+//    if colspan > 1 {
+//        attributes["colspan"] = colspan.description
+//    }
+//    if rowspan > 1 {
+//        attributes["rowspan"] = rowspan.description
+//    }
+//    if let className {
+//        attributes["class"] = consume className
+//    }
     return ._element(.th, attributes: attributes, contents: contents)
 }
 
 func td(colspan: UInt = 0, rowspan: UInt = 0, class className: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
-    var attributes = [String: String]()
-    if colspan > 1 {
-        attributes["colspan"] = colspan.description
-    }
-    if rowspan > 1 {
-        attributes["rowspan"] = rowspan.description
-    }
-    if let className {
-        attributes["class"] = consume className
-    }
+    var attributes = [HTMLNode.Attribute]()
+//    if colspan > 1 {
+//        attributes["colspan"] = colspan.description
+//    }
+//    if rowspan > 1 {
+//        attributes["rowspan"] = rowspan.description
+//    }
+//    if let className {
+//        attributes["class"] = consume className
+//    }
     return ._element(.td, attributes: attributes, contents: contents)
 }
 
@@ -367,12 +361,12 @@ package func label(@HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
     ._element(.label, contents: contents())
 }
 
-package func input(attributes: consuming [String: String]) -> HTMLNode {
-    ._voidElement(.input, attributes: consume attributes)
+package func input(_ attributes: HTMLNode.Attribute...) -> HTMLNode {
+    ._voidElement(.input, attributes: attributes)
 }
 
-package func fieldset(role: consuming String, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
-    ._element(.fieldset, attributes: ["role": role], contents: contents())
+package func fieldset(role: consuming HTMLNode.Attribute.Role, @HTMLBuilder _ contents: () -> [HTMLNode]) -> HTMLNode {
+    ._element(.fieldset, attributes: [.role(role)], contents: contents())
 }
 
 package func legend(_ text: consuming String) -> HTMLNode {

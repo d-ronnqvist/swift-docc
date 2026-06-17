@@ -89,7 +89,7 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
             // Replace the content in reverse order so that the earlier ranges remain valid.
             copy.replaceSubrange(contentReplacementRange, with: String(decoding: HTMLFormatter.format(content, options: [.omitOptionalEndTags, .omitOptionalQuotesAroundAttributeValues]), as: UTF8.self))
             if let plainDescription {
-                let metaDescription = meta(attributes: ["name": "description", "content": plainDescription])
+                let metaDescription = meta(.name("description"), .contents(plainDescription))
                 copy.replaceSubrange(descriptionReplacementRange, with: String(decoding: HTMLFormatter.format(metaDescription, options: .omitOptionalQuotesAroundAttributeValues), as: UTF8.self))
             }
             copy.replaceSubrange(titleReplacementRange,   with: title)

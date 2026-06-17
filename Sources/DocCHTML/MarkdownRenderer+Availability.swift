@@ -8,7 +8,6 @@
  See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
-
 package extension MarkdownRenderer {
     /// Information about the versions that a piece of API is available for a given platform.
     struct AvailabilityInfo {
@@ -31,7 +30,7 @@ package extension MarkdownRenderer {
     
     /// Creates an HTML element that describes the versions that a piece of API is available for the platforms described in the given availability information.
     func availability(_ info: [AvailabilityInfo]) -> HTMLNode {
-        ul(id: "availability", contents: info.map {
+        ul(/*id: "availability", */contents: info.map {
             var text = $0.name
             
             let description: String
@@ -47,17 +46,17 @@ package extension MarkdownRenderer {
                 description = "Available on \($0.name)"
             }
             
-            var attributes = [
-                "aria-label": "\(text), \(description)",
-                "title": description
+            var attributes: [HTMLNode.Attribute] = [
+//                "aria-label": "\(text), \(description)",
+                .title(description)
             ]
             if $0.isBeta {
-                attributes["class"] = "beta"
+                attributes.append(.class("beta"))
             } else if $0.deprecated != nil {
-                attributes["class"] = "deprecated"
+                attributes.append(.class("deprecated"))
             }
             
-            return li(attributes: goal == .richness ? attributes : [:], contents: [.text(text)])
+            return li(attributes: goal == .richness ? attributes : [], contents: [.text(text)])
         })
     }
 }

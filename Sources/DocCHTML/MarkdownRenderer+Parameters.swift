@@ -49,7 +49,7 @@ package extension MarkdownRenderer {
             // In practice DocC only encounters one or two different languages. If there would be a third one,
             // produce correct looking pages that may include duplicated markup by not trying to share parameters across languages.
             info.map { language, info in
-                dl(class: "\(language.id)-only", contents: _singleLanguageParameterItems(info))
+                dl([.class("\(language.id)-only")], contents: _singleLanguageParameterItems(info))
             }
         }
         
@@ -66,7 +66,7 @@ package extension MarkdownRenderer {
         items.reserveCapacity(parameterInfo.count * 2)
         for parameter in parameterInfo {
             // name
-            items.append(dt(parameter.name))
+            items.append(dt(contents: parameter.name))
             // description
             items.append(dd(contents: parameter.content.map { visit($0) }))
         }
@@ -115,9 +115,9 @@ package extension MarkdownRenderer {
             let index = (offset + primaryOnlyIndices.count(where: { $0 < offset })) * 2
             items.insert(contentsOf: [
                 // Name
-                dt(class: "\(secondary.language.id)-only", parameter.name),
+                dt(.class("\(secondary.language.id)-only"), contents: parameter.name),
                 // Description
-                dd(class: "\(secondary.language.id)-only", contents: parameter.content.map { visit($0) })
+                dd(.class("\(secondary.language.id)-only"), contents: parameter.content.map { visit($0) })
             ], at: index)
         }
         

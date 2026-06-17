@@ -36,13 +36,13 @@ package extension HTMLRenderer {
         // Use relative paths to shared assets like a style sheet or favicon.
         let pathPrefixToArchiveRoot = String(repeating: "../", count: reference.url.pathComponents.count - 1)
         
-        return html(lang: "en-US") {
+        return html(.lang("en-US")) {
             head {
-                meta(charset: "utf-8")
+                meta(.utf8CharSet)
                 meta(viewport: "width=device-width,initial-scale=1,viewport-fit=cover")
                 
                 // FIXME: Add relative favicon links (rdar://177705447 (Include favicon images in the static HTML output))
-                link(rel: "stylesheet", href: "\(pathPrefixToArchiveRoot)reference.css")
+                link(.rel([.stylesheet] /*"stylesheet"*/), .href("\(pathPrefixToArchiveRoot)reference.css"))
                 
                 title(metadata.title)
                 
@@ -74,19 +74,19 @@ package extension HTMLRenderer {
                 // 4. The default footer
                 footer {
                     // FIXME: Interacting with this radio group doesn't change the page's color scheme (rdar://177705056)
-                    fieldset(role: "radiogroup") {
+                    fieldset(role: .radioGroup) {
                         legend("Select a color scheme preference")
                         
                         label {
-                            input(attributes: ["type": "radio", "name": "color-scheme", "value": "light"])
+                            input()//(attributes: ["type": "radio", "name": "color-scheme", "value": "light"])
                             HTMLNode.text("Light")
                         }
                         label {
-                            input(attributes: ["type": "radio", "name": "color-scheme", "value": "dark"])
+                            input()//(attributes: ["type": "radio", "name": "color-scheme", "value": "dark"])
                             HTMLNode.text("Dark")
                         }
                         label {
-                            input(attributes: ["type": "radio", "name": "color-scheme", "value": "auto", "checked": ""])
+                            input()//(attributes: ["type": "radio", "name": "color-scheme", "value": "auto", "checked": ""])
                             HTMLNode.text("Auto")
                         }
                     }
@@ -124,14 +124,10 @@ package extension HTMLRenderer {
     }
 }
 
-private func meta(charset: String) -> HTMLNode {
-    meta(attributes: ["charset": charset])
-}
-
 private func meta(viewport: String) -> HTMLNode {
-    meta(attributes: ["name": "viewport", "content": viewport])
+    meta()//attributes: ["name": "viewport", "content": viewport])
 }
 
 private func meta(description: String) -> HTMLNode {
-    meta(attributes: ["name": "description", "content": description])
+    meta()//attributes: ["name": "description", "content": description])
 }

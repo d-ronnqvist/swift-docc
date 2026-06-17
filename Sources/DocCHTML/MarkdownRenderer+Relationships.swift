@@ -97,13 +97,13 @@ package extension MarkdownRenderer {
                 [ code(contents: wordBreak(symbolName: titlesByLanguage.first!.value)) ]
             } else {
                 titlesByLanguage.map { language, title in
-                    code(class: "\(language.id)-only", contents: wordBreak(symbolName: title))
+                    code([.class("\(language.id)-only")], contents: wordBreak(symbolName: title))
                 }
             }
         }
         
         return li(contents: [
-            a(href: path(to: element.path), contents: items)
+            a([.href(path(to: element.path))], contents: items)
         ])
     }
 }

@@ -164,10 +164,17 @@ package struct HTMLRenderer {
         let node = context.documentationCache[reference]!
         
         // Draw a background color for the hero section and an article/collection glyph
-        let hero = section(
-            id:    goal == .conciseness ? nil : "hero",
-            class: goal == .conciseness ? nil : (article.topics == nil ? "article" : "api-collection"),
-        ) {
+        let heroAttributes: [HTMLNode.Attribute]
+        switch goal {
+        case .richness:
+            heroAttributes = [
+//                .id
+                .class(article.topics == nil ? "article" : "api-collection")
+            ]
+        case .conciseness:
+            heroAttributes = []
+        }
+        let hero = DocCHTML.section/*(heroAttributes)*/ {
             // Breadcrumbs
             renderer.breadcrumbs(
                 references: (context.shortestFinitePath(to: reference) ?? [context.soleRootModuleReference!]).map { $0.url },
@@ -175,14 +182,14 @@ package struct HTMLRenderer {
             )
             
             // Eyebrow
-            makeEyebrow(text: article.topics == nil ? "Article": "API Collection")
+            p { article.topics == nil ? "Article": "API Collection" }
             
             // Title
             h1 { node.name.plainText }
             
             // Abstract
             if let abstract = article.abstract {
-                makeAbstract(abstract)
+                renderer.visit(abstract)
             }
             
             // Deprecation message
@@ -250,7 +257,7 @@ package struct HTMLRenderer {
         let node = context.documentationCache[reference]!
         
         // Draw a background color for the hero section and a module glyph
-        let hero = section(id: goal == .richness ? "hero" : nil, class: "module") {
+        let hero = DocCHTML.section/*(id: goal == .richness ? "hero" : nil, class: "module")*/ {
             // Breadcrumbs
             if symbol.kind.identifier != .module {
                 renderer.breadcrumbs(
@@ -259,7 +266,7 @@ package struct HTMLRenderer {
                 )
             }
             // Eyebrow
-            makeEyebrow(text: symbol.roleHeading)
+            p { symbol.roleHeading }
             
             // Title
             switch symbol.titleVariants.values(goal: goal) {
@@ -267,7 +274,7 @@ package struct HTMLRenderer {
                     h1(contents: renderer.wordBreak(symbolName: title))
                 case .languageSpecific(let languageSpecificTitles):
                     for (language, languageSpecificTitle) in languageSpecificTitles.sorted(by: { $0.key < $1.key }) {
-                        h1(class: "\(language.id)-only", contents: renderer.wordBreak(symbolName: languageSpecificTitle))
+                        h1([.class("\(language.id)-only")], contents: renderer.wordBreak(symbolName: languageSpecificTitle))
                     }
                 case .empty:
                     // This shouldn't happen but because of a shortcoming in the API design of `DocumentationDataVariants`, it can't be guaranteed.
@@ -276,7 +283,7 @@ package struct HTMLRenderer {
             
             // Abstract
             if let abstract = symbol.abstract {
-                makeAbstract(abstract)
+                renderer.visit(abstract)
             }
             
             // Availability
@@ -412,22 +419,10 @@ package struct HTMLRenderer {
             )
         )
     }
-   
-    private func makeEyebrow(text: String) -> HTMLNode {
-        p(id: goal == .richness ? "eyebrow" : nil) { text }
-    }
-    
-    private func makeAbstract(_ abstract: Paragraph) -> HTMLNode {
-        var paragraph = renderer.visit(abstract)
-        if goal == .richness {
-            paragraph.idAttribute = "abstract"
-        }
-        return paragraph
-    }
     
     private func makeDeprecationSummary(markup: [any Markup]) -> HTMLNode {
-        aside(class: "deprecated") {
-            p(class: "label") { "Deprecated" }
+        aside(.class("deprecated")) {
+            p(.class("label")) { "Deprecated" }
             
             for child in markup {
                 renderer.visit(child)

@@ -39,10 +39,10 @@ package extension MarkdownRenderer {
             [code(contents: _declarationTokens(for: fragmentsByLanguage[0].value, in: fragmentsByLanguage[0].key))]
         } else {
             fragmentsByLanguage.map { language, fragments in
-                code(class: "\(language.id)-only", contents: _declarationTokens(for: fragments, in: language))
+                code([.class("\(language.id)-only")], contents: _declarationTokens(for: fragments, in: language))
             }
         }
-        return pre(id: "declaration", contents: declarations)
+        return pre(/*.id("declaration"),*/ contents: declarations)
     }
     
     private func _declarationTokens(for fragments: [DeclarationFragment], in language: SourceLanguage) -> [HTMLNode] {
@@ -65,10 +65,10 @@ package extension MarkdownRenderer {
                 fallthrough
             }
             // If the token refers to a symbol that the `linkProvider` is aware of, make that fragment a link to that symbol.
-            return a(href: path(to: reference), class: fragment.kind.htmlClassName, contents: [consume text])
+            return a([.href(path(to: reference)), .class(fragment.kind.htmlClassName)], contents: [consume text])
         case .keyword, .attribute, .number, .string, .internalParameter:
             // The declaration element is expected to scroll, so individual fragments don't need to contain explicit word breaks.
-            return span(class: fragment.kind.htmlClassName, contents: [consume text])
+            return span([.class(fragment.kind.htmlClassName)], contents: [consume text])
         }
     }
 }

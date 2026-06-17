@@ -100,7 +100,7 @@ package extension MarkdownRenderer {
         case .single(.conceptual(let title)):
             items = [
                 // TODO: Pass information about the type of icon that the conceptual element should display.
-                p(class: goal == .richness ? "api-collection" : nil, contents: [.text(title)])
+                p(goal == .richness ? [.class("api-collection")] : [], contents: [.text(title)])
             ]
             
         case .single(.symbol(let fragments)):
@@ -128,7 +128,7 @@ package extension MarkdownRenderer {
         
         var content = [
             // DocC-Render only makes the item's name an anchor, not its abstract
-            a(href: path(to: element.path), contents: items)
+            a([.href(path(to: element.path))], contents: items)
         ]
         
         // Add the formatted abstract if the linked element has one.
@@ -156,11 +156,11 @@ package extension MarkdownRenderer {
     private func _symbolSubheading(_ fragments: [LinkedElement.SymbolNameFragment], languageFilter: SourceLanguage?) -> HTMLNode {
         switch goal {
         case .richness:
-            code(class: languageFilter.map { "\($0.id)-only" }, contents: fragments.map {
-                span(class: $0.kind.rawValue, contents: wordBreak(symbolName: $0.text))
+            code(languageFilter.map { [.class("\($0.id)-only")] } ?? [], contents: fragments.map {
+                span([.class($0.kind.rawValue)], contents: wordBreak(symbolName: $0.text))
             })
         case .conciseness:
-            code(class: languageFilter.map { "\($0.id)-only" }, contents: [.text(fragments.map(\.text).joined())])
+            code(languageFilter.map { [.class("\($0.id)-only")] } ?? [], contents: [.text(fragments.map(\.text).joined())])
         }
     }
 }

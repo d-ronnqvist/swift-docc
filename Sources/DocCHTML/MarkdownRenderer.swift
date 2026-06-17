@@ -79,14 +79,14 @@ package struct MarkdownRenderer<Provider: LinkProvider> {
         let aside = Aside(blockQuote)
         
         var children: [HTMLNode] = [
-            p(class: "label", contents: [.text(aside.kind.displayName)])
+            p([.class("label")], contents: [.text(aside.kind.displayName)])
         ]
         children.reserveCapacity(1 + aside.content.count)
         for child in aside.content {
             children.append(visit(child))
         }
         
-        return DocCHTML.aside(class: "aside \(aside.kind.rawValue.lowercased())", contents: children)
+        return DocCHTML.aside([.class(aside.kind.rawValue.lowercased())], contents: children)
     }
     
     /// Transforms a markdown heading into a`<h[1...6]>` HTML element whose content is wrapped in an `<a>` HTML element that references the heading itself.
@@ -116,28 +116,14 @@ package struct MarkdownRenderer<Provider: LinkProvider> {
     func selfReferencingHeading(level: Int, content: [HTMLNode], plainTextTitle: @autoclosure () -> String) -> HTMLNode {
         switch goal {
         case .conciseness:
-            return switch level {
-                case 1:  h1(contents: content)
-                case 2:  h2(contents: content)
-                case 3:  h3(contents: content)
-                case 4:  h4(contents: content)
-                case 5:  h5(contents: content)
-                default: h6(contents: content)
-            }
+            return heading(level: level, contents: content)
             
         case .richness:
             let id = urlReadableFragment(plainTextTitle())
             // Wrap the heading content in an anchor ...
-            let content = [a(href: "#\(id)", contents: content)]
+            let content = [a([.href("#\(id)")], contents: content)]
             // ... that refers to the heading itself
-            return switch level {
-                case 1:  h1(id: id, contents: content)
-                case 2:  h2(id: id, contents: content)
-                case 3:  h3(id: id, contents: content)
-                case 4:  h4(id: id, contents: content)
-                case 5:  h5(id: id, contents: content)
-                default: h6(id: id, contents: content)
-            }
+            return heading(level: level, /*.id(), */ contents: content)
         }
     }
     
@@ -156,7 +142,7 @@ package struct MarkdownRenderer<Provider: LinkProvider> {
         case .richness:
             let id = urlReadableFragment(sectionName)
             content.insert(h2(contents: [
-                a(href: "#\(id)", contents: [.text(sectionName)])
+                a([.href("#\(id)")], contents: [.text(sectionName)])
             ]), at: 0)
             return [section(contents: content)]
             
@@ -289,7 +275,7 @@ package struct MarkdownRenderer<Provider: LinkProvider> {
             }
             
             // Use relative links for DocC elements and the full link otherwise.
-            return a(href: linkedElement.flatMap { path(to: $0.path) } ?? destination.absoluteString, contents: customTitle)
+            return a([.href(linkedElement.flatMap { path(to: $0.path) } ?? destination.absoluteString)], contents: customTitle)
         }
         
         // Make a relative link
@@ -300,14 +286,14 @@ package struct MarkdownRenderer<Provider: LinkProvider> {
                 
                 case .languageSpecificSymbol(let namesByLanguageID):
                     RenderHelpers.sortedLanguageSpecificValues(namesByLanguageID).map { language, name in
-                        code(class: "\(language.id)-only", contents: wordBreak(symbolName: name))
+                        code([.class("\(language.id)-only")], contents: wordBreak(symbolName: name))
                     }
             }
             
-            return a(href: path(to: linkedElement.path), contents: children)
+            return a([.href(path(to: linkedElement.path))], contents: children)
         } else if destination.scheme != "doc" {
             // This could be a http link
-            return a(href:  destination.absoluteString, contents: [.text(destination.absoluteString)])
+            return a([.href(destination.absoluteString)], contents: [.text(destination.absoluteString)])
         } else {
             // If this is an unresolved documentation link, try to display only the name of the linked symbol; without the rest of its path and without its disambiguation
             return .text(linkProvider.fallbackLinkText(linkString: destination.path))
@@ -345,11 +331,11 @@ package struct MarkdownRenderer<Provider: LinkProvider> {
                 
             case .languageSpecificSymbol(let namesByLanguageID):
                 RenderHelpers.sortedLanguageSpecificValues(namesByLanguageID).map { language, name in
-                    code(class: "\(language.id)-only", contents: wordBreak(symbolName: name))
+                    code([.class("\(language.id)-only")], contents: wordBreak(symbolName: name))
                 }
         }
         
-        return a(href: path(to: linkedElement.path), contents: children)
+        return a([.href(path(to: linkedElement.path))], contents: children)
     }
     
     package func path(to other: URL) -> String {
@@ -419,11 +405,11 @@ package struct MarkdownRenderer<Provider: LinkProvider> {
             for (style, images) in asset.files.sorted(by: { $0.key.rawValue > $1.key.rawValue }) { // order light images before dark images
                 var attributes = srcAttributes(for: images)
                 attributes["media"] = "(prefers-color-scheme: \(style.rawValue))"
-                children.append(source(attributes: attributes))
+                children.append(source(attributes: []))
             }
         }
         
-        children.append(img(attributes: imgAttributes))
+        children.append(img(attributes: []))
         
         return picture(contents: children)
     }
@@ -444,7 +430,7 @@ package struct MarkdownRenderer<Provider: LinkProvider> {
     /// </pre>
     /// ```
     func visit(_ codeBlock: CodeBlock) -> HTMLNode {
-        pre(class: codeBlock.language, contents: [
+        pre(codeBlock.language.map { [.class($0)] } ?? [], contents: [
             code(contents: [.text(codeBlock.code)])
         ])
     }
