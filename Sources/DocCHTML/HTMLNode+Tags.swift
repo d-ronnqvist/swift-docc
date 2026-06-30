@@ -130,7 +130,7 @@ package func article(_ attributes: consuming [HTMLNode.Attribute] = [], contents
     ._element(.article, attributes: attributes, contents: contents)
 }
 
-package func section(_ attributes: HTMLNode.Attribute..., @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
+package func section(_ attributes: [HTMLNode.Attribute], @HTMLBuilder contents: () -> [HTMLNode]) -> HTMLNode {
     ._element(.section, attributes: attributes, contents: contents())
 }
 func section(_ attributes: consuming [HTMLNode.Attribute] = [], contents: [HTMLNode]) -> HTMLNode {
@@ -329,29 +329,29 @@ func tr(contents: [HTMLNode]) -> HTMLNode {
 
 func th(colspan: UInt = 0, rowspan: UInt = 0, class className: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
     var attributes = [HTMLNode.Attribute]()
-//    if colspan > 1 {
-//        attributes["colspan"] = colspan.description
-//    }
-//    if rowspan > 1 {
-//        attributes["rowspan"] = rowspan.description
-//    }
-//    if let className {
-//        attributes["class"] = consume className
-//    }
+    if colspan > 1 {
+        attributes.append(.colSpan(colspan))
+    }
+    if rowspan > 1 {
+        attributes.append(.rowSpan(rowspan))
+    }
+    if let className {
+        attributes.append(.class(consume className))
+    }
     return ._element(.th, attributes: attributes, contents: contents)
 }
 
 func td(colspan: UInt = 0, rowspan: UInt = 0, class className: consuming String? = nil, contents: [HTMLNode]) -> HTMLNode {
     var attributes = [HTMLNode.Attribute]()
-//    if colspan > 1 {
-//        attributes["colspan"] = colspan.description
-//    }
-//    if rowspan > 1 {
-//        attributes["rowspan"] = rowspan.description
-//    }
-//    if let className {
-//        attributes["class"] = consume className
-//    }
+    if colspan > 1 {
+        attributes.append(.colSpan(colspan))
+    }
+    if rowspan > 1 {
+        attributes.append(.rowSpan(rowspan))
+    }
+    if let className {
+        attributes.append(.class(consume className))
+    }
     return ._element(.td, attributes: attributes, contents: contents)
 }
 

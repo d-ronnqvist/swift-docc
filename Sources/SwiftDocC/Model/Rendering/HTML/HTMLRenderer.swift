@@ -168,13 +168,13 @@ package struct HTMLRenderer {
         switch goal {
         case .richness:
             heroAttributes = [
-//                .id
-                .class(article.topics == nil ? "article" : "api-collection")
+                .id("hero"),
+                .class(article.topics == nil ? "article" : "api-collection"),
             ]
         case .conciseness:
             heroAttributes = []
         }
-        let hero = DocCHTML.section/*(heroAttributes)*/ {
+        let hero = DocCHTML.section(heroAttributes) {
             // Breadcrumbs
             renderer.breadcrumbs(
                 references: (context.shortestFinitePath(to: reference) ?? [context.soleRootModuleReference!]).map { $0.url },
@@ -257,7 +257,12 @@ package struct HTMLRenderer {
         let node = context.documentationCache[reference]!
         
         // Draw a background color for the hero section and a module glyph
-        let hero = DocCHTML.section/*(id: goal == .richness ? "hero" : nil, class: "module")*/ {
+        let heroAttributes: [HTMLNode.Attribute] = if goal == .richness {
+            [.id("hero"), .class("module")]
+        } else {
+            []
+        }
+        let hero = DocCHTML.section(heroAttributes) {
             // Breadcrumbs
             if symbol.kind.identifier != .module {
                 renderer.breadcrumbs(

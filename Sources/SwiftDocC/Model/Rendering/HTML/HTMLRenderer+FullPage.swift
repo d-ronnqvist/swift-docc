@@ -38,7 +38,7 @@ package extension HTMLRenderer {
         
         return html(.lang("en-US")) {
             head {
-                meta(.utf8CharSet)
+                meta(.charSet) // "utf-8" is the only supported char-set.
                 meta(viewport: "width=device-width,initial-scale=1,viewport-fit=cover")
                 
                 // FIXME: Add relative favicon links (rdar://177705447 (Include favicon images in the static HTML output))

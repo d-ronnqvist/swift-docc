@@ -322,7 +322,7 @@ package struct HTMLFormatter {
             buffer.append(.init(ascii: " "))
             _append(attribute.nameForFormatting)
             
-            var value = attribute.value
+            var value = attribute.valueForFormatting
             guard !value.isEmpty else { continue }
             
             value.withUTF8 {

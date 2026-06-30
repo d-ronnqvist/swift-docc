@@ -78,7 +78,7 @@ package struct HTMLNode: Sendable {
     package var idAttribute: String? {
         switch _storage {
         case .element(_, let attributes, _), .voidElement(_, let attributes):
-            attributes.first(where: { $0.matches(name: "id") })?.value
+            attributes.first(where: { $0.matches(name: "id") })?.valueForFormatting
         case .text:
             nil
         }
