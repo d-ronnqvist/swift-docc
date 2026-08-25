@@ -76,7 +76,7 @@ struct DocumentationCurator {
         }
         
         // Check if the link has been externally resolved already.
-        if let bundleID = unresolved.topicURL.components.host.map({ DocumentationBundle.Identifier(rawValue: $0) }),
+        if let bundleID = unresolved.topicURL.components.host.map({ DocumentationContext.Inputs.Identifier(rawValue: $0) }),
            context.configuration.externalDocumentationConfiguration.sources[bundleID] != nil || context.configuration.convertServiceConfiguration.fallbackResolver != nil {
             if case .success(let resolvedExternalReference) = context.externallyResolvedLinks[unresolved.topicURL] {
                 return resolvedExternalReference
@@ -102,13 +102,20 @@ struct DocumentationCurator {
                 return path.prependingLeadingSlash
             }
         }()
-        let reference = ResolvedTopicReference(
+        let lookupReference = ResolvedTopicReference(
             bundleID: resolved.bundleID,
             path: sourceArticlePath,
             sourceLanguages: resolved._sourceLanguages)
-        
-        guard let currentArticle = self.context.uncuratedArticles[reference],
-            let documentationNode = try? DocumentationNode(reference: reference, article: currentArticle.value) else { return nil }
+
+        guard let currentArticle = self.context.uncuratedArticles[lookupReference] else { return nil }
+
+        guard let (documentationNode, _) = DocumentationContext.documentationNodeAndTitle(
+            for: currentArticle,
+            availableSourceLanguages: resolved.sourceLanguages,
+            kind: .article,
+            in: context.inputs
+        ) else { return nil }
+        let reference = documentationNode.reference
         
         // An article has been found which needs to be extracted from the article cache
         // and curated under the current symbol. To do this we need to re-create the reference

@@ -331,10 +331,12 @@ public struct DocumentationNode {
     /// - Parameters:
     ///   - article: An optional documentation extension article.
     ///   - engine: A diagnostics engine.
+    ///   - inputs: A collection of build inputs.
+    ///   - featureFlags: Feature flags that conditionally enable behaviors in Swift-DocC.
     mutating func initializeSymbolContent(
         documentationExtension: Article?,
         engine: DiagnosticEngine,
-        bundle: DocumentationBundle,
+        inputs: DocumentationContext.Inputs,
         featureFlags: FeatureFlags
     ) {
         precondition(unifiedSymbol != nil && symbol != nil, "You can only call initializeSymbolContent() on a symbol node.")
@@ -342,7 +344,7 @@ public struct DocumentationNode {
         let (markup, docChunks, metadataFromDocumentationComment) = Self.contentFrom(
             documentedSymbol: unifiedSymbol?.documentedSymbol,
             documentationExtension: documentationExtension,
-            bundle: bundle,
+            inputs: inputs,
             featureFlags: featureFlags,
             engine: engine
         )
@@ -497,14 +499,16 @@ public struct DocumentationNode {
     
     /// Given a symbol and an optional article returns documentation content.
     /// - Parameters:
-    ///   - symbol: A symbol graph symbol.
-    ///   - article: An optional article with documentation content.
+    ///   - documentedSymbol: A symbol graph symbol.
+    ///   - documentationExtension: An optional article with documentation content.
+    ///   - inputs: A collection of build inputs.
+    ///   - featureFlags: Feature flags that conditionally enable behaviors in Swift-DocC.
     ///   - engine: A diagnostics engine to use for diagnostics found while parsing content.
     /// - Returns: The prepared node documentation content.
     static func contentFrom(
         documentedSymbol: SymbolGraph.Symbol?,
         documentationExtension: Article?,
-        bundle: DocumentationBundle? = nil,
+        inputs: DocumentationContext.Inputs? = nil,
         featureFlags: FeatureFlags,
         engine: DiagnosticEngine
     ) -> (
@@ -548,14 +552,14 @@ public struct DocumentationNode {
 
             var diagnostics = [Diagnostic]()
             
-            if let bundle {
+            if let inputs {
                 metadata = DirectiveParser()
                     .parseSingleDirective(
                         Metadata.self,
                         from: &docCommentMarkupElements,
                         parentType: Symbol.self,
                         source: docCommentLocation?.url,
-                        bundle: bundle,
+                        inputs: inputs,
                         featureFlags: featureFlags,
                         diagnostics: &diagnostics
                     )
@@ -903,7 +907,7 @@ public struct DocumentationNode {
                 directive.name == DeprecationSummary.directiveName ? directive : nil
             }
         }
-        guard let deprecationSummaryDirective, let symbol = unifiedSymbol?.documentedSymbol else {
+        guard let deprecationSummaryDirective, let symbol, let unifiedSymbol else {
             // Nothing to warn about unless there is a DeprecationSummary directive in the markup
             return
         }
@@ -912,7 +916,15 @@ public struct DocumentationNode {
         
         // Check the information from both the source attributes and the Available directive before raising a warning.
         let availabilityFromSource = {
-            var availability = symbol.availability ?? []
+            var combinedInSourceAvailability: [String: SymbolGraph.Symbol.Availability.AvailabilityItem] = [:]
+            for availabilities in unifiedSymbol.availability.values {
+                for item in availabilities where item.obsoletedVersion == nil && !item.isUnconditionallyUnavailable {
+                    let name = item.domain.map({ PlatformName(operatingSystemName: $0.rawValue).displayName }) ?? "*"
+                    combinedInSourceAvailability[name] = item
+                }
+            }
+            
+            var availability = Array(combinedInSourceAvailability.values)
             let isDeprecatedPartitionIndex = availability.partition(by: { $0.isUnconditionallyDeprecated || $0.deprecatedVersion != nil })
             return (
                 available:  availability[..<isDeprecatedPartitionIndex],

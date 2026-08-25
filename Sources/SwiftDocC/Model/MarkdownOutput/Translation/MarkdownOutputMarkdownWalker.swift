@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2025-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -72,6 +72,9 @@ extension MarkdownOutputMarkupWalker {
             return
         }
         
+        // Some content is filtered from the markdown export. If this entire section consists of filtered content, the heading should not be added. 
+        let markdownBeforeSection = markdown
+        
         if let heading = addingHeading ?? type(of: section).title, heading.isEmpty == false {
             // Don't add if there is already a heading in the content
             if let first = section.content.first as? Heading, first.level == 2 {
@@ -80,9 +83,15 @@ extension MarkdownOutputMarkupWalker {
                 visit(Heading(level: 2, Text(heading)))
             }
         }
+        let markdownWithSectionHeading = markdown
         
         for content in section.content {
             self.visit(content)
+        }
+        
+        if markdown == markdownWithSectionHeading {
+            // No content was added for this section, revert to where we were before
+            markdown = markdownBeforeSection
         }
     }
         
@@ -215,7 +224,8 @@ extension MarkdownOutputMarkupWalker {
         
         guard
             let resolved = context.referenceIndex[destination],
-            let node = context.topicGraph.nodeWithReference(resolved)
+            let doc = try? context.entity(with: resolved),
+            let symbol = doc.semantic as? Symbol
         else {
             // Unresolved symbol - use code voice, unless we're in a list, in which case, ignore it
             if isRenderingLinkList {
@@ -225,25 +235,20 @@ extension MarkdownOutputMarkupWalker {
             return (code, nil)
         }
         
-        let linkTitle: String
+        var linkTitle = symbol.proseVariants[.swift] ?? symbol.title
         var linkListAbstract: (any Markup)?
                 
-        if isRenderingLinkList,
-           let doc = try? context.entity(with: resolved),
-           let symbol = doc.semantic as? Symbol
-        {
+        if isRenderingLinkList {
             linkListAbstract = (doc.semantic as? Symbol)?.abstract
-            if let fragments = symbol.navigator {
+            if let fragments = symbol.subHeadingVariants[.swift] ?? symbol.declaration.mainRenderFragments()?.declarationFragments {
                 linkTitle = fragments
                     .map { $0.spelling }
-                    .joined(separator: " ")
-            } else {
-                linkTitle = symbol.proseVariants.firstValue ?? symbol.title
+                    .joined()
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
             }
             relationships.insert(relationship(source: resolved, type: .belongsToTopic, subtype: nil))
-        } else {
-            linkTitle = node.title
         }
+        
         let (link, _) = convertLink(Link(destination: destination, title: linkTitle, [InlineCode(linkTitle)]), relationships: &relationships)
         return (link, linkListAbstract)
     }
@@ -298,7 +303,7 @@ extension MarkdownOutputMarkupWalker {
             }
             linkTitle = anchorSection?.title ?? article.title?.plainText ?? resolved.lastPathComponent
         } else if let symbol = doc.semantic as? Symbol {
-            linkTitle = anchorSection?.title ?? symbol.proseVariants.firstValue ?? symbol.title
+            linkTitle = anchorSection?.title ?? symbol.proseVariants[.swift] ?? symbol.title
         } else {
             linkTitle = anchorSection?.title ?? resolved.lastPathComponent
         }
@@ -308,15 +313,19 @@ extension MarkdownOutputMarkupWalker {
             linkListAbstract = nil
         }
         
-        let linkMarkup: any RecurringInlineMarkup
-        if doc.semantic is Symbol {
-            linkMarkup = InlineCode(linkTitle)
+        var convertedLink = Link(destination: outputDestination, title: linkTitle, [])
+        // Preserve any inline title markup for the link. If the plain text value is the same as the destination, or was empty, then this was an auto-link or double-backtick symbol link and will require an appropriate title.
+        if link.plainText == link.destination || link.plainText.isEmpty {
+            if doc.semantic is Symbol {
+                convertedLink.setInlineChildren([InlineCode(linkTitle)])
+            } else {
+                convertedLink.setInlineChildren([Text(linkTitle)])
+            }
         } else {
-            linkMarkup = Text(linkTitle)
+            convertedLink.setInlineChildren(link.inlineChildren)
         }
         
-        let link = Link(destination: outputDestination, title: linkTitle, [linkMarkup])
-        return (link, linkListAbstract)
+        return (convertedLink, linkListAbstract)
     }
     
     mutating func visitLink(_ link: Link) {
@@ -342,22 +351,22 @@ extension MarkdownOutputMarkupWalker {
     }
     
     mutating func visitBlockDirective(_ blockDirective: BlockDirective) {
-        let bundle = context.inputs
+        let inputs = context.inputs
         switch blockDirective.name {
         case VideoMedia.directiveName:
-            guard let video = VideoMedia(from: blockDirective, for: bundle, featureFlags: context.configuration.featureFlags) else {
+            guard let video = VideoMedia(from: blockDirective, for: inputs, featureFlags: context.configuration.featureFlags) else {
                 return
             }
             visit(video)
                         
         case ImageMedia.directiveName:
-            guard let image = ImageMedia(from: blockDirective, for: bundle, featureFlags: context.configuration.featureFlags) else {
+            guard let image = ImageMedia(from: blockDirective, for: inputs, featureFlags: context.configuration.featureFlags) else {
                 return
             }
             visit(image)
             
         case Row.directiveName:
-            guard let row = Row(from: blockDirective, for: bundle, featureFlags: context.configuration.featureFlags) else {
+            guard let row = Row(from: blockDirective, for: inputs, featureFlags: context.configuration.featureFlags) else {
                 return
             }
             for column in row.columns {
@@ -367,7 +376,7 @@ extension MarkdownOutputMarkupWalker {
                 }
             }
         case TabNavigator.directiveName:
-            guard let tabs = TabNavigator(from: blockDirective, for: bundle, featureFlags: context.configuration.featureFlags) else {
+            guard let tabs = TabNavigator(from: blockDirective, for: inputs, featureFlags: context.configuration.featureFlags) else {
                 return
             }
             if let defaultLanguage = context.sourceLanguages(for: identifier).first?.name,
@@ -394,7 +403,7 @@ extension MarkdownOutputMarkupWalker {
                 }
             }
         case Snippet.directiveName:
-            guard let snippet = Snippet(from: blockDirective, for: bundle, featureFlags: context.configuration.featureFlags) else {
+            guard let snippet = Snippet(from: blockDirective, for: inputs, featureFlags: context.configuration.featureFlags) else {
                 return
             }
             guard case .success(let resolved) = context.snippetResolver.resolveSnippet(path: snippet.path) else {

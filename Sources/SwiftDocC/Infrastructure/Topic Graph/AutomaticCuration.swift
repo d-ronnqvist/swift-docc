@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2021-2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2021-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -10,7 +10,7 @@
 
 private import Foundation
 private import Markdown
-import SymbolKit
+@preconcurrency import SymbolKit
 private import DocCCommon
 
 private let automaticSeeAlsoLimit: Int = {
@@ -146,7 +146,6 @@ public struct AutomaticCuration {
     /// - Parameters:
     ///   - node: A node for which to generate a See Also group.
     ///   - context: A documentation context.
-    ///   - bundle: A documentation bundle.
     /// - Returns: A group title and the group's references or links.
     ///   `nil` if the method can't find any relevant links to automatically generate a See Also content.
     static func seeAlso(
