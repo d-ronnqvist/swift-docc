@@ -202,7 +202,7 @@ package enum ConvertActionConverter {
         // Write various metadata
         if shouldSerializeLinkHierarchy {
             try signposter.withIntervalSignpost("Emit digest", id: signposter.makeSignpostID()) {
-                try outputConsumer.finishConsumingLinkElementSummaries()
+                try outputConsumer.finishConsumingLinkableElementSummaries()
                 if emitDigest {
                     // Only emit the other digest files if `--emit-digest` is passed
                     try outputConsumer.consume(indexingRecords: supplementaryRenderInfo.indexingRecords)

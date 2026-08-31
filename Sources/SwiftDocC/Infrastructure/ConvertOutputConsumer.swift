@@ -24,7 +24,7 @@ public protocol ConvertOutputConsumer {
     /// > Warning: This method might be called concurrently.
     func consumeIncremental(linkableElementSummary: LinkDestinationSummary) throws
     /// Finishes consuming all linkable element summaries that were incrementally and individually consumed.
-    func finishConsumingLinkElementSummaries() throws
+    func finishConsumingLinkableElementSummaries() throws
     
     /// Consumes the indexing records produced during a conversion.
     func consume(indexingRecords: [IndexingRecord]) throws
@@ -68,17 +68,17 @@ public extension ConvertOutputConsumer {
 // Default implementations to avoid a source breaking change from introducing new protocol requirements
 public extension ConvertOutputConsumer {
     func consumeIncremental(linkableElementSummary: LinkDestinationSummary) throws {}
-    func finishConsumingLinkElementSummaries() throws {}
+    func finishConsumingLinkableElementSummaries() throws {}
 }
 
 // Default implementation so that conforming types don't need to implement deprecated API.
 public extension ConvertOutputConsumer {
-    @available(*, deprecated, renamed: "consumeIncremental(linkableElementSummary:)", message: "Implement 'consumeIncremental(linkableElementSummary:)' and 'finishConsumingLinkElementSummaries' instead. This deprecated API will be removed after 6.5 is released")
+    @available(*, deprecated, renamed: "consumeIncremental(linkableElementSummary:)", message: "Implement 'consumeIncremental(linkableElementSummary:)' and 'finishConsumingLinkableElementSummaries()' instead. This deprecated API will be removed after 6.5 is released")
     func consume(linkableElementSummaries: [LinkDestinationSummary]) throws {
         for summary in linkableElementSummaries {
             try consumeIncremental(linkableElementSummary: summary)
         }
-        try finishConsumingLinkElementSummaries()
+        try finishConsumingLinkableElementSummaries()
     }
 }
 
