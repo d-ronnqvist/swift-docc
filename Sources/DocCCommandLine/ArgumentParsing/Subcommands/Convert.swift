@@ -489,7 +489,7 @@ extension Docc {
                 Write additional link metadata files to the output directory to support resolving documentation links to the documentation in that output directory.
                 """)
             )
-            var enableLinkHierarchySerialization = true
+            var enableLinkHierarchySerialization = false
             
             // This flag only exist to allow developers to pass the previous '--enable-experimental-...' flag without errors.
             @Flag(name: .customLong("enable-experimental-external-link-support"), help: .hidden)
@@ -563,9 +563,11 @@ extension Docc {
                 Convert.warnAboutDeprecatedOptionIfNeeded("experimental-parse-doxygen-commands", message: "This flag has no effect. Doxygen support is enabled by default.")
                 Convert.warnAboutDeprecatedOptionIfNeeded("enable-experimental-parameters-and-returns-validation", message: "This flag has no effect. Parameter and return value validation is enabled by default.")
                 Convert.warnAboutDeprecatedOptionIfNeeded("enable-experimental-mentioned-in", message: "This flag has no effect. Automatic mentioned in sections is enabled by default.")
-                Convert.warnAboutDeprecatedOptionIfNeeded("enable-experimental-external-link-support", message: "This flag has no effect. External link support is enabled by default.")
+                Convert.warnAboutDeprecatedOptionIfNeeded("enable-experimental-external-link-support", message: "Use `--enable-external-link-support` instead.")
                 Convert.warnAboutDeprecatedOptionIfNeeded("index", message: "Use '--emit-lmdb-index' indead.")
-                emitLMDBIndex = emitLMDBIndex
+                if enableExperimentalLinkHierarchySerialization {
+                    enableLinkHierarchySerialization = true
+                }
             }
         }
 
