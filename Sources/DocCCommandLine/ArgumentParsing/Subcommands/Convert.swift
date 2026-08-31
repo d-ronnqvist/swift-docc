@@ -387,7 +387,7 @@ extension Docc {
         
         // MARK: - Link resolution options
         
-        @OptionGroup(title: "Link resolution options (Experimental)")
+        @OptionGroup(title: "Link resolution options")
         var linkResolutionOptions: LinkResolutionOptions
         
         struct LinkResolutionOptions: ParsableArguments {
@@ -396,7 +396,7 @@ extension Docc {
                 name: [.customLong("dependency")],
                 parsing: ArrayParsingStrategy.singleValue,
                 help: ArgumentHelp("A path to a documentation archive to resolve external links against.", discussion: """
-                Only documentation archives built with '--enable-experimental-external-link-support' are supported as dependencies.
+                Only documentation archives built with '--enable-external-link-support' are supported as dependencies.
                 """),
                 transform: URL.init(fileURLWithPath:)
             )
