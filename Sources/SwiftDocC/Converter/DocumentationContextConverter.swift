@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2021-2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2021-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -40,7 +40,7 @@ public class DocumentationContextConverter {
     
     /// Creates a new node converter for the given context.
     ///
-    /// The converter uses bundle and context to resolve references to other documentation and describe the documentation hierarchy.
+    /// The converter uses context to resolve references to other documentation and describe the documentation hierarchy.
     ///
     /// - Parameters:
     ///   - context: The context that the converter uses to to resolve references it finds in the documentation node's content.
@@ -68,25 +68,6 @@ public class DocumentationContextConverter {
         self.shouldEmitSymbolAccessLevels = emitSymbolAccessLevels
         self.sourceRepository = sourceRepository
         self.symbolIdentifiersWithExpandedDocumentation = symbolIdentifiersWithExpandedDocumentation
-    }
-    @available(*, deprecated, renamed: "init(context:renderContext:emitSymbolSourceFileURIs:emitSymbolAccessLevels:sourceRepository:symbolIdentifiersWithExpandedDocumentation:)", message: "Use 'init(context:renderContext:emitSymbolSourceFileURIs:emitSymbolAccessLevels:sourceRepository:symbolIdentifiersWithExpandedDocumentation:)' instead. This deprecated API will be removed after 6.4 is released.")
-    public convenience init(
-        bundle _: DocumentationBundle,
-        context: DocumentationContext,
-        renderContext: RenderContext,
-        emitSymbolSourceFileURIs: Bool = false,
-        emitSymbolAccessLevels: Bool = false,
-        sourceRepository: SourceRepository? = nil,
-        symbolIdentifiersWithExpandedDocumentation: [String]? = nil
-    ) {
-        self.init(
-            context: context,
-            renderContext: renderContext,
-            emitSymbolSourceFileURIs: emitSymbolSourceFileURIs,
-            emitSymbolAccessLevels: emitSymbolAccessLevels,
-            sourceRepository: sourceRepository,
-            symbolIdentifiersWithExpandedDocumentation: symbolIdentifiersWithExpandedDocumentation
-        )
     }
     
     /// Converts a documentation node to a render node.

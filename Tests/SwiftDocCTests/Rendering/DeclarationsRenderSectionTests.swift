@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2021-2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2021-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -10,6 +10,7 @@
 
 import Foundation
 import XCTest
+import Testing
 @testable import SwiftDocC
 import DocCTestUtilities
 import SymbolKit
@@ -211,10 +212,10 @@ class DeclarationsRenderSectionTests: XCTestCase {
                 JSONFile(name: "symbols\(forwards ? "2" : "1").symbols.json", content: symbolGraph2),
             ])
 
-            let (bundle, context) = try await loadBundle(catalog: catalog)
+            let (_, context) = try await loadBundle(catalog: catalog)
 
             let reference = ResolvedTopicReference(
-                bundleID: bundle.id,
+                bundleID: context.inputs.id,
                 path: "/documentation/PlatformSpecificDeclarations/myInit",
                 sourceLanguage: .swift
             )
@@ -251,7 +252,7 @@ class DeclarationsRenderSectionTests: XCTestCase {
             CopyOfFile(original: symbolGraphFile),
         ])
 
-        let (bundle, context) = try await loadBundle(catalog: catalog, configuration: configuration)
+        let (_, context) = try await loadBundle(catalog: catalog, configuration: configuration)
 
         // Make sure that type decorators like arrays, dictionaries, and optionals are correctly highlighted.
         do {
@@ -262,7 +263,7 @@ class DeclarationsRenderSectionTests: XCTestCase {
             // func overload1(param: Set<Int>) {}
             // func overload1(param: [Int: Int]) {}
             let reference = ResolvedTopicReference(
-                bundleID: bundle.id,
+                bundleID: context.inputs.id,
                 path: "/documentation/FancyOverloads/overload1(param:)",
                 sourceLanguage: .swift
             )
@@ -313,7 +314,7 @@ class DeclarationsRenderSectionTests: XCTestCase {
             // func overload2(p1: (Int) -> Int?, p2: Int) {}
             // func overload2(p1: ((Int) -> Int)?, p2: Int) {} // <- overload group
             let reference = ResolvedTopicReference(
-                bundleID: bundle.id,
+                bundleID: context.inputs.id,
                 path: "/documentation/FancyOverloads/overload2(p1:p2:)",
                 sourceLanguage: .swift
             )
@@ -368,7 +369,7 @@ class DeclarationsRenderSectionTests: XCTestCase {
             // func overload3<T: Hashable>(_ p: [T: T]) {}
             // func overload3<K: Hashable, V>(_ p: [K: V]) {}
             let reference = ResolvedTopicReference(
-                bundleID: bundle.id,
+                bundleID: context.inputs.id,
                 path: "/documentation/FancyOverloads/overload3(_:)",
                 sourceLanguage: .swift
             )
@@ -498,11 +499,11 @@ class DeclarationsRenderSectionTests: XCTestCase {
             CopyOfFile(original: symbolGraphFile),
         ])
 
-        let (bundle, context) = try await loadBundle(catalog: catalog)
+        let (_, context) = try await loadBundle(catalog: catalog)
 
         for hash in ["7eht8", "8p1lo", "858ja"] {
             let reference = ResolvedTopicReference(
-                bundleID: bundle.id,
+                bundleID: context.inputs.id,
                 path: "/documentation/FancyOverloads/overload3(_:)-\(hash)",
                 sourceLanguage: .swift
             )
@@ -532,13 +533,13 @@ class DeclarationsRenderSectionTests: XCTestCase {
             CopyOfFile(original: symbolGraphFile),
         ])
 
-        let (bundle, context) = try await loadBundle(catalog: catalog, configuration: configuration)
+        let (_, context) = try await loadBundle(catalog: catalog, configuration: configuration)
 
         // MyClass<T>
         // - myFunc() where T: Equatable
         // - myFunc() where T: Hashable // <- overload group
         let reference = ResolvedTopicReference(
-            bundleID: bundle.id,
+            bundleID: context.inputs.id,
             path: "/documentation/ConformanceOverloads/MyClass/myFunc()",
             sourceLanguage: .swift
         )
@@ -576,4 +577,60 @@ private func declarationsAndHighlights(for section: DeclarationRenderSection) ->
     var declarations = otherDeclarations.declarations.map(\.tokens)
     declarations.insert(section.tokens, at: otherDeclarations.displayIndex)
     return declarations.flatMap(declarationAndHighlights(for:))
+}
+
+@Suite
+struct DeclarationsRenderSectionTests_new {
+    // This verifies determinism in previously non-deterministic behavior that cannot be reproduced reliably in a test.
+    // If you suspect that your changes might affect this test, you need to run it repeatedly (and relaunch for each repetition)
+    // to verify that the behavior remains deterministic.
+    @Test
+    func highlightsOverloadsAgainstHighestPriorityPlatformDeclaration() async throws {
+        func declaration(type: String, default defaultValue: String) -> SymbolGraph.Symbol.DeclarationFragments {
+            .init(declarationFragments: [
+                .init(kind: .keyword, spelling: "func", preciseIdentifier: nil),
+                .init(kind: .text, spelling: " ", preciseIdentifier: nil),
+                .init(kind: .identifier, spelling: "make", preciseIdentifier: nil),
+                .init(kind: .text, spelling: "(_ value: \(type) = \(defaultValue))", preciseIdentifier: nil),
+            ])
+        }
+
+        func graph(platform: String, default defaultValue: String) -> SymbolGraph {
+            makeSymbolGraph(
+                moduleName: "Overloads",
+                platform: .init(operatingSystem: .init(name: platform)),
+                symbols: [
+                    // A method whose default value changes per platform.
+                    makeSymbol(id: "main", kind: .func, pathComponents: ["make(_:)"], otherMixins: [declaration(type: "Value", default: defaultValue)]),
+                    // An overload with a different parameter type that always has the macOS default value.
+                    makeSymbol(id: "sibling", kind: .func, pathComponents: ["make(_:)"], otherMixins: [declaration(type: "Other", default: ".standard")]),
+                ])
+        }
+
+        var configuration = DocumentationContext.Configuration()
+        configuration.featureFlags.isExperimentalOverloadedSymbolPresentationEnabled = true
+
+        let catalog = Folder(name: "unit-test.docc", content: [
+            JSONFile(name: "macos.symbols.json", content: graph(platform: "macos", default: ".standard")),
+            JSONFile(name: "tvos.symbols.json", content: graph(platform: "tvos", default: ".compact")),
+            JSONFile(name: "watchos.symbols.json", content: graph(platform: "watchos", default: ".mini")),
+            JSONFile(name: "visionos.symbols.json", content: graph(platform: "visionos", default: ".immersive")),
+        ])
+        let context = try await load(catalog: catalog, configuration: configuration)
+
+        let reference = try #require(context.documentationCache.reference(symbolID: "main"))
+        let symbol = try #require(context.entity(with: reference).semantic as? Symbol)
+        var translator = RenderNodeTranslator(context: context, identifier: reference)
+        let renderNode = try #require(translator.visitSymbol(symbol) as? RenderNode)
+        let section = try #require(renderNode.primaryContentSections.compactMap({ $0 as? DeclarationsRenderSection }).first)
+
+        // The macOS declaration must be used to compute the LCS, where only the parameter type differs.
+        // If a different platform is used, the sibling overload gets highlighted differently here.
+        #expect(declarationsAndHighlights(for: try #require(section.declarations.first)) == [
+            "func make(_ value: Other = .standard)",
+            "                   ~~~~~             ",
+            "func make(_ value: Value = .standard)",
+            "                   ~~~~~             ",
+        ])
+    }
 }

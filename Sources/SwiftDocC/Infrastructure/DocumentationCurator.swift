@@ -11,6 +11,7 @@
 import Foundation
 import Markdown
 private import SymbolKit
+private import DocCCommon
 
 /// Crawls a context and curates nodes if necessary.
 struct DocumentationCurator {
@@ -76,7 +77,7 @@ struct DocumentationCurator {
         }
         
         // Check if the link has been externally resolved already.
-        if let bundleID = unresolved.topicURL.components.host.map({ DocumentationBundle.Identifier(rawValue: $0) }),
+        if let bundleID = unresolved.topicURL.components.host.map({ DocumentationContext.Inputs.Identifier(rawValue: $0) }),
            context.configuration.externalDocumentationConfiguration.sources[bundleID] != nil || context.configuration.convertServiceConfiguration.fallbackResolver != nil {
             if case .success(let resolvedExternalReference) = context.externallyResolvedLinks[unresolved.topicURL] {
                 return resolvedExternalReference
@@ -102,13 +103,20 @@ struct DocumentationCurator {
                 return path.prependingLeadingSlash
             }
         }()
-        let reference = ResolvedTopicReference(
+        let lookupReference = ResolvedTopicReference(
             bundleID: resolved.bundleID,
             path: sourceArticlePath,
             sourceLanguages: resolved._sourceLanguages)
-        
-        guard let currentArticle = self.context.uncuratedArticles[reference],
-            let documentationNode = try? DocumentationNode(reference: reference, article: currentArticle.value) else { return nil }
+
+        guard let currentArticle = self.context.uncuratedArticles[lookupReference] else { return nil }
+
+        guard let (documentationNode, _) = DocumentationContext.documentationNodeAndTitle(
+            for: currentArticle,
+            availableSourceLanguages: resolved.sourceLanguages,
+            kind: .article,
+            in: context.inputs
+        ) else { return nil }
+        let reference = documentationNode.reference
         
         // An article has been found which needs to be extracted from the article cache
         // and curated under the current symbol. To do this we need to re-create the reference
@@ -148,8 +156,11 @@ struct DocumentationCurator {
     ///   - prepareForCuration: An optional closure to call just before walking the node's task group links.
     ///   - relateNodes: A closure to call when a parent <-> child relationship is found.
     mutating func crawlChildren(of nodeReference: ResolvedTopicReference, prepareForCuration: (ResolvedTopicReference) -> Void = {_ in}, relateNodes: (ResolvedTopicReference, ResolvedTopicReference) -> Void) throws {
-        // Keeping track if all articles have been curated.
-        curatedNodes.insert(nodeReference)
+        // Track if all articles have been curated.
+        // If a node has already been crawled, skip it.
+        guard curatedNodes.insert(nodeReference).inserted else {
+            return
+        }
 
         guard let documentationNode = context.documentationCache[nodeReference] else {
             return
@@ -313,13 +324,29 @@ struct DocumentationCurator {
                     continue
                 }
                 
-                // Link reference successfully resolved to a topic node
-                relateNodes(nodeReference, childReference)
-                
-                guard !curatedNodes.contains(childReference) else {
-                    // Don't crawl the same symbol more than once. 
+                // Verify that the parent and child have at least one source language in common.
+                // Curating across disjoint source languages would make the child unreachable
+                // from any variant of the parent page in the navigator.
+                if documentationNode.availableSourceLanguages.isDisjoint(with: childDocumentationNode.availableSourceLanguages) {
+                    let nodeLanguages = documentationNode.availableSourceLanguages.map(\.name).sorted().joined(separator: ", ")
+                    let childLanguages = childDocumentationNode.availableSourceLanguages.map(\.name).sorted().joined(separator: ", ")
+                    diagnostics.append(Diagnostic(
+                        source: source(), severity: .warning, range: range(), identifier: "UnreachableCrossLanguageCuration",
+                        summary: "Organizing \(describeForDiagnostic(childReference).singleQuoted) under \(describeForDiagnostic(nodeReference).singleQuoted) would make it unreachable in the documentation hierarchy",
+                        explanation: """
+                        \(topicSectionBaseExplanation). The documentation hierarchy requires a curated link and its parent to share at least one source language.
+                        If this link contributed to the documentation hierarchy, \(describeForDiagnostic(childReference).singleQuoted) wouldn't be reachable from any variant of \(describeForDiagnostic(nodeReference).singleQuoted) because they have no source languages in common:
+
+                        - \(describeForDiagnostic(childReference).singleQuoted): \(childLanguages)
+                        - \(describeForDiagnostic(nodeReference).singleQuoted): \(nodeLanguages)
+                        """,
+                        solutions: removeListItemSolutions
+                    ))
                     continue
                 }
+
+                // Link reference successfully resolved to a topic node
+                relateNodes(nodeReference, childReference)
                 
                 // Descend further into curated topics
                 try crawlChildren(of: childReference, prepareForCuration: prepareForCuration, relateNodes: relateNodes)

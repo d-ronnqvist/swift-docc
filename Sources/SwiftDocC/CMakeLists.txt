@@ -19,13 +19,13 @@ add_library(SwiftDocC
   Benchmark/Metrics/TopicGraphHash.swift
   "Catalog Processing/GeneratedCurationWriter.swift"
   Checker/Checker.swift
-  Checker/Checkers/AbstractContainsFormattedTextOnly.swift
   Checker/Checkers/DuplicateTopicsSection.swift
   Checker/Checkers/InvalidAdditionalTitle.swift
   Checker/Checkers/InvalidCodeBlockOption.swift
   Checker/Checkers/MissingAbstract.swift
   Checker/Checkers/NonInclusiveLanguageChecker.swift
   Checker/Checkers/NonOverviewHeadingChecker.swift
+  Checker/Checkers/MiscasedSectionHeading.swift
   Checker/Checkers/SeeAlsoInTopicsHeadingChecker.swift
   Converter/DocumentationContextConverter.swift
   Converter/DocumentationNodeConverter.swift
@@ -104,10 +104,10 @@ add_library(SwiftDocC
   Infrastructure/Diagnostics/Solution.swift
   Infrastructure/Diagnostics/SourcePosition.swift
   Infrastructure/Diagnostics/TerminalHelper.swift
-  Infrastructure/DocumentationBundle+Identifier.swift
-  Infrastructure/DocumentationBundle.swift
-  Infrastructure/DocumentationBundleFileTypes.swift
+  Infrastructure/DocumentationCatalogFileTypes.swift
   Infrastructure/DocumentationContext+Breadcrumbs.swift
+  Infrastructure/DocumentationContext+Inputs+Identifier.swift
+  Infrastructure/DocumentationContext+Inputs.swift
   Infrastructure/DocumentationContext.swift
   Infrastructure/DocumentationCurator.swift
   Infrastructure/Extensions/KindIdentifier+Curation.swift
@@ -148,9 +148,9 @@ add_library(SwiftDocC
   "Infrastructure/Symbol Graph/UnresolvedTopicReference+Symbol.swift"
   "Infrastructure/Topic Graph/AutomaticCuration.swift"
   "Infrastructure/Topic Graph/TopicGraph.swift"
+  Infrastructure/Workspace/CatalogDiscoveryOptions.swift
   Infrastructure/Workspace/DefaultAvailability.swift
-  Infrastructure/Workspace/DocumentationBundle+Info.swift
-  Infrastructure/Workspace/DocumentationWorkspaceDataProvider.swift
+  Infrastructure/Workspace/DocumentationContext+Inputs+Info.swift
   Infrastructure/Workspace/FeatureFlags+Info.swift
   LinkTargets/LinkDestinationSummary.swift
   Model/AnchorSection.swift
@@ -178,6 +178,7 @@ add_library(SwiftDocC
   Model/Rendering/DocumentationContentRenderer.swift
   Model/Rendering/HTML/HTMLContentConsumer.swift
   Model/Rendering/HTML/HTMLRenderer.swift
+  Model/Rendering/HTML/HTMLRenderer+FullPage.swift
   Model/Rendering/LinkTitleResolver.swift
   "Model/Rendering/Navigation Tree/RenderHierarchy.swift"
   "Model/Rendering/Navigation Tree/RenderHierarchyChapter.swift"
@@ -230,7 +231,6 @@ add_library(SwiftDocC
   Model/Rendering/SemanticVersion.swift
   Model/Rendering/Symbol/AttributesRenderSection.swift
   Model/Rendering/Symbol/AvailabilityRenderMetadataItem.swift
-  Model/Rendering/Symbol/AvailabilitySortOrder.swift
   Model/Rendering/Symbol/ConformanceSection.swift
   Model/Rendering/Symbol/ContentRenderSection.swift
   Model/Rendering/Symbol/DeclarationRenderSection+SymbolGraph.swift
@@ -371,6 +371,7 @@ add_library(SwiftDocC
   Semantics/Symbol/DeprecationSummary.swift
   Semantics/Symbol/DocumentationDataVariants+SymbolGraphSymbol.swift
   Semantics/Symbol/DocumentationDataVariants.swift
+  Semantics/Symbol/PlatformDeclarations.swift
   Semantics/Symbol/PlatformName.swift
   Semantics/Symbol/Relationship.swift
   Semantics/Symbol/Symbol.swift

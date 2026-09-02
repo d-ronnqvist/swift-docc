@@ -486,6 +486,7 @@ struct ReferenceResolver: SemanticVisitor {
         return Symbol(
             kindVariants: symbol.kindVariants,
             titleVariants: symbol.titleVariants,
+            proseVariants: symbol.proseVariants,
             subHeadingVariants: symbol.subHeadingVariants,
             navigatorVariants: symbol.navigatorVariants,
             roleHeadingVariants: symbol.roleHeadingVariants,
@@ -538,15 +539,15 @@ fileprivate extension URL {
 }
 
 extension Image {
-    func reference(in bundle: DocumentationBundle) -> ResourceReference? {
+    func reference(in inputs: DocumentationContext.Inputs) -> ResourceReference? {
         guard let source else {
-            return ResourceReference(bundleID: bundle.id, path: "")
+            return ResourceReference(bundleID: inputs.id, path: "")
         }
         
         if let url = URL(string: source), url.isLikelyWebURL {
             return nil
         } else {
-            return ResourceReference(bundleID: bundle.id, path: source)
+            return ResourceReference(bundleID: inputs.id, path: source)
         }
     }
 }

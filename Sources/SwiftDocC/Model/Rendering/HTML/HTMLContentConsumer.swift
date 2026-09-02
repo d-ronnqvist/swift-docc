@@ -1,19 +1,14 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2025-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
  See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
-#if canImport(FoundationXML)
-// TODO: Consider other HTML rendering options as a future improvement (rdar://165755530)
-package import FoundationXML
-#else
-package import Foundation
-#endif
+package import DocCHTML
 
 /// A consumer for HTML content produced during documentation conversion.
 package protocol HTMLContentConsumer {
@@ -26,15 +21,19 @@ package protocol HTMLContentConsumer {
     /// It's the consumers responsibility to insert the information into a template or skeletal structure to produce a valid HTML file for each page.
     ///
     /// - Parameters:
-    ///   - mainContent: The contents for this page as an XHTML node.
+    ///   - mainContent: The contents for this page.
     ///   - metadata: Metadata information (title and description) about this page.
     ///   - reference: The resolved topic reference that identifies this page.
     func consume(
-        mainContent: XMLNode,
+        mainContent: HTMLNode,
         metadata: (
             title: String,
             description: String?
         ),
         forPage reference: ResolvedTopicReference
     ) throws
+    
+    // This is not intended to be a long term design for determining which is the primary output format (rdar://177867282)
+    // We need to make sure that this short-term workaround isn't surfaced in any `public` API so that we retain the ability to make large design changes.
+    var _isPrimaryOutputFormat: Bool { get }
 }

@@ -13,12 +13,13 @@ package import Foundation
 @_spi(ExternalLinks) // SPI to set `context.linkResolver.dependencyArchives`
 public import SwiftDocC
 private import Markdown
+private import DocCHTML
 
 #if canImport(os)
 private import os
 #endif
 
-/// An action that converts a source bundle into compiled documentation.
+/// An action that converts a collection of documentation inputs into compiled documentation.
 public struct ConvertAction: AsyncAction {
     private let signposter = ConvertActionConverter.signposter
     
@@ -27,6 +28,7 @@ public struct ConvertAction: AsyncAction {
     let htmlTemplateDirectory: URL?
     
     private let emitDigest: Bool
+    private let outputFormat: Docc.Convert.OutputFormat
     let treatWarningsAsErrors: Bool
     let experimentalEnableCustomTemplates: Bool
     private let experimentalModifyCatalogWithGeneratedCuration: Bool
@@ -59,8 +61,9 @@ public struct ConvertAction: AsyncAction {
     /// 
     ///     A JSON representation is built and emitted regardless of this value.
     ///   - fileManager: The file manager that the convert action uses to create directories and write data to files.
+    ///   - outputFormat: The format that the convert action will output the documentation in when writing to the output location.
     ///   - documentationCoverageOptions: Indicates whether or not to generate coverage output and at what level.
-    ///   - bundleDiscoveryOptions: Options to configure how the converter discovers documentation bundles.
+    ///   - catalogDiscoveryOptions: Options to configure how the converter discovers documentation catalogs.
     ///   - diagnosticLevel: The level above which diagnostics will be filtered out. This filter level is inclusive, i.e. if a level of `DiagnosticSeverity.information` is specified, diagnostics with a severity up to and including `.information` will be printed.
     ///   - diagnosticEngine: The engine that will collect and emit diagnostics during this action.
     ///   - diagnosticFilePath: The path to a file where the convert action should write diagnostic information.
@@ -74,7 +77,7 @@ public struct ConvertAction: AsyncAction {
     ///   - featureFlags: A collection of feature flags that the convert action uses to enable or disable certain optional behaviors.
     ///   - transformForStaticHosting: `true` if the convert action should process the build documentation archive so that it supports a static hosting environment, otherwise `false`.
     ///   - includeContentInEachHTMLFile: `true` if the convert action should process each static hosting HTML file so that it includes documentation content for environments without JavaScript enabled, otherwise `false`.
-    ///   - allowArbitraryCatalogDirectories: `true` if the convert action should consider the root location as a documentation bundle if it doesn't discover another bundle, otherwise `false`.
+    ///   - allowArbitraryCatalogDirectories: `true` if the convert action should consider the root location as a documentation catalog if it doesn't discover another catalog, otherwise `false`.
     ///   - hostingBasePath: The base path where the built documentation archive will be hosted at.
     ///   - sourceRepository: The source repository where the documentation's sources are hosted.
     ///   - temporaryDirectory: The location where the convert action should write temporary files while converting the documentation.
@@ -90,8 +93,9 @@ public struct ConvertAction: AsyncAction {
         buildIndex: Bool = false,
         fileManager: any FileManagerProtocol = FileManager.default,
         temporaryDirectory: URL,
+        outputFormat: Docc.Convert.OutputFormat = .json,
         documentationCoverageOptions: DocumentationCoverageOptions = .noCoverage,
-        bundleDiscoveryOptions: BundleDiscoveryOptions = .init(),
+        catalogDiscoveryOptions: CatalogDiscoveryOptions = .init(),
         diagnosticLevel: String? = nil,
         diagnosticEngine: DiagnosticEngine? = nil,
         diagnosticFilePath: URL? = nil,
@@ -114,6 +118,7 @@ public struct ConvertAction: AsyncAction {
         self.targetDirectory = targetDirectory
         self.htmlTemplateDirectory = htmlTemplateDirectory
         self.emitDigest = emitDigest
+        self.outputFormat = outputFormat
         self.buildLMDBIndex = buildIndex
         self.fileManager = fileManager
         self.temporaryDirectory = temporaryDirectory
@@ -181,28 +186,28 @@ public struct ConvertAction: AsyncAction {
         }
         
         if let outOfProcessResolver {
-            configuration.externalDocumentationConfiguration.sources[outOfProcessResolver.bundleID] = outOfProcessResolver
+            configuration.externalDocumentationConfiguration.sources[outOfProcessResolver.id] = outOfProcessResolver
             configuration.externalDocumentationConfiguration.globalSymbolResolver = outOfProcessResolver
         }
         configuration.externalDocumentationConfiguration.dependencyArchives = dependencies
         
-        let (bundle, dataProvider) = try signposter.withIntervalSignpost("Discover inputs", id: signposter.makeSignpostID()) {
+        let (inputs, dataProvider) = try signposter.withIntervalSignpost("Discover inputs", id: signposter.makeSignpostID()) {
             try DocumentationContext.InputsProvider(fileManager: fileManager)
             .inputsAndDataProvider(
                 startingPoint: documentationBundleURL,
                 allowArbitraryCatalogDirectories: allowArbitraryCatalogDirectories,
-                options: bundleDiscoveryOptions
+                options: catalogDiscoveryOptions
             )
         }
 
         self.configuration = configuration
         
-        self.inputs = bundle
+        self.inputs = inputs
         self.dataProvider = dataProvider
     }
     
     let configuration: DocumentationContext.Configuration
-    private let inputs: DocumentationBundle
+    private let inputs: DocumentationContext.Inputs
     private let dataProvider: any DataProvider
     
     /// A block of extra work that tests perform to affect the time it takes to convert documentation
@@ -213,7 +218,7 @@ public struct ConvertAction: AsyncAction {
     /// Tests that don't verify the contents of the navigator index can set this to `true` so that they can use a virtual, in-memory, file system.
     var _completelySkipBuildingIndex: Bool = false
     
-    /// Converts each eligible file from the source documentation bundle,
+    /// Converts each eligible file from the source documentation inputs,
     /// saves the results in the given output alongside the template files.
     public func perform(logHandle: inout LogHandle) async throws -> ActionResult {
         try await perform(logHandle: &logHandle).0
@@ -221,7 +226,17 @@ public struct ConvertAction: AsyncAction {
     
     func perform(logHandle: inout LogHandle) async throws -> (ActionResult, DocumentationContext) {
         // FIXME: Use `defer` again when the asynchronous defer-statement miscompilation (rdar://137774949) is fixed.
-        let temporaryFolder = try createTempFolder(with: htmlTemplateDirectory)
+        let temporaryFolder: URL
+        switch outputFormat {
+        case .json:
+            temporaryFolder = try createTempFolder(with: htmlTemplateDirectory)
+        case .experimentalHTML:
+            temporaryFolder = try createTempFolder(with: nil)
+            for file in DocCHTML.StaticResources.allFiles {
+                try fileManager.createFile(at: temporaryFolder.appendingPathComponent(file.filename), contents: file.data)
+            }
+        }
+        
         do {
             let result = try await _perform(logHandle: &logHandle, temporaryFolder: temporaryFolder)
             diagnosticEngine.flush()
@@ -272,7 +287,7 @@ public struct ConvertAction: AsyncAction {
 //        }
 
         let indexHTML: URL?
-        if let htmlTemplateDirectory {
+        if let htmlTemplateDirectory, outputFormat == .json {
             let indexHTMLUrl = temporaryFolder.appendingPathComponent(
                 HTMLTemplate.indexFileName.rawValue,
                 isDirectory: false
@@ -313,23 +328,31 @@ public struct ConvertAction: AsyncAction {
         let indexer = _completelySkipBuildingIndex ? nil : try Indexer(outputURL: temporaryFolder, bundleID: inputs.id)
 
         let registerInterval = signposter.beginInterval("Register", id: signposter.makeSignpostID())
-        let context = try await DocumentationContext(bundle: inputs, dataProvider: dataProvider, diagnosticEngine: diagnosticEngine, configuration: configuration)
+        let context = try await DocumentationContext(inputs: inputs, dataProvider: dataProvider, diagnosticEngine: diagnosticEngine, configuration: configuration)
         signposter.endInterval("Register", registerInterval)
         
         let outputConsumer = ConvertFileWritingConsumer(
             targetFolder: temporaryFolder,
-            bundleRootFolder: rootURL,
+            catalogRootFolder: rootURL,
             fileManager: fileManager,
             context: context,
             indexer: indexer,
             enableCustomTemplates: experimentalEnableCustomTemplates,
             // Don't transform for static hosting if the `FileWritingHTMLContentConsumer` will create per-page index.html files
             transformForStaticHostingIndexHTML: transformForStaticHosting && !includeContentInEachHTMLFile ? indexHTML : nil,
-            bundleID: inputs.id
+            inputsID: inputs.id
         )
         
-        let htmlConsumer: FileWritingHTMLContentConsumer?
-        if includeContentInEachHTMLFile, let indexHTML {
+        let htmlConsumer: (any HTMLContentConsumer)?
+        if outputFormat == .experimentalHTML {
+            htmlConsumer = try FullPageHTMLContentConsumer(
+                targetFolder: temporaryFolder,
+                fileManager: fileManager,
+                prettyPrint: shouldPrettyPrintOutputJSON, // Use the same configuration as the JSON output to make it convenient for the developer.
+                customHeader: experimentalEnableCustomTemplates ? inputs.customHeader : nil,
+                customFooter: experimentalEnableCustomTemplates ? inputs.customFooter : nil
+            )
+        } else if includeContentInEachHTMLFile, let indexHTML {
             htmlConsumer = try FileWritingHTMLContentConsumer(
                 targetFolder: temporaryFolder,
                 fileManager: fileManager,
@@ -458,12 +481,12 @@ public struct ConvertAction: AsyncAction {
 
             let outputConsumer = ConvertFileWritingConsumer(
                 targetFolder: targetDirectory,
-                bundleRootFolder: rootURL,
+                catalogRootFolder: rootURL,
                 fileManager: fileManager,
                 context: context,
                 indexer: nil,
                 transformForStaticHostingIndexHTML: nil,
-                bundleID: inputs.id
+                inputsID: inputs.id
             )
 
             try outputConsumer.consume(benchmarks: Benchmark.main)

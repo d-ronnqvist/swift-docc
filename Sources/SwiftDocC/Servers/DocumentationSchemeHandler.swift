@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2021 Apple Inc. and the Swift project authors
+ Copyright (c) 2021-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -18,9 +18,7 @@ public class DocumentationSchemeHandler: NSObject {
     
     // The schema to support the documentation.
     public static let scheme = "doc"
-    public static var fullScheme: String {
-        return "\(scheme)://"
-    }
+    public static let fullScheme = "\(scheme)://"
     
     /// Fallback handler is called if the response data is nil.
     public var fallbackHandler: FallbackResponseHandler?
@@ -29,20 +27,26 @@ public class DocumentationSchemeHandler: NSObject {
     var fileServer: FileServer
     
     /// The default file provider to serve content from memory.
-    var memoryProvider = MemoryFileServerProvider()
+    var memoryProvider: MemoryFileServerProvider
     
     /**
      Initializes a `DocumentationSchemeHandler` with content coming from a folder.
      */
-    public init(withTemplateURL templateURL:URL) {
+    public convenience init(withTemplateURL templateURL: URL) {
+        self.init(withTemplateURL: templateURL, fileManager: FileManager.default)
+    }
+    
+    package init(withTemplateURL templateURL: URL, fileManager: any FileManagerProtocol) {
         fileServer = FileServer(baseURL: URL(string: DocumentationSchemeHandler.fullScheme)!)
-        let templateProvider = FileSystemServerProvider(directoryPath: templateURL.path)!
+        memoryProvider = MemoryFileServerProvider(fileManager: fileManager)
+        let templateProvider = FileSystemServerProvider(directoryPath: templateURL.path, fileManager: fileManager)!
         fileServer.register(provider: templateProvider)
         fileServer.register(provider: memoryProvider, subPath: "/data")
     }
     
     public override init() {
         fileServer = FileServer(baseURL: URL(string: DocumentationSchemeHandler.fullScheme)!)
+        memoryProvider = MemoryFileServerProvider()
         fileServer.register(provider: memoryProvider)
     }
     

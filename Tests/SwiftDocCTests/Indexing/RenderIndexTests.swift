@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2022-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -12,6 +12,7 @@ import XCTest
 import DocCTestUtilities
 
 @testable import SwiftDocC
+import SymbolKit
 
 final class RenderIndexTests: XCTestCase {
     func testTestBundleRenderIndexGeneration() async throws {
@@ -634,7 +635,7 @@ final class RenderIndexTests: XCTestCase {
                 subdirectory: "Test Resources"
             )!
 
-        let bundle = Folder(name: "unit-test-swift.docc", content: [
+        let catalog = Folder(name: "unit-test-swift.docc", content: [
             InfoPlist(displayName: "TestBundle", identifier: "com.test.example"),
             CopyOfFile(original: swiftWithDeprecatedSymbolGraphFile)
         ])
@@ -643,10 +644,10 @@ final class RenderIndexTests: XCTestCase {
         let testTemporaryDirectory = try createTemporaryDirectory()
 
         let bundleDirectory = testTemporaryDirectory.appendingPathComponent(
-           bundle.name,
+           catalog.name,
            isDirectory: true
         )
-        try bundle.write(to: bundleDirectory)
+        try catalog.write(to: bundleDirectory)
 
         let (_, _, context) = try await loadBundle(from: bundleDirectory)
 
@@ -715,6 +716,51 @@ final class RenderIndexTests: XCTestCase {
         XCTAssertTrue(
             symbolNode.isDeprecated,
             "A symbol with @DeprecationSummary but no platform deprecation should appear deprecated in the navigator index."
+        )
+    }
+
+    func testRenderIndexGenerationWithPerPlatformUnconditionalDeprecation() async throws {
+        let catalog = Folder(name: "unit-test.docc", content: [
+            InfoPlist(displayName: "TestBundle", identifier: "com.test.example"),
+            JSONFile(name: "SomeModule.symbols.json", content: makeSymbolGraph(
+                moduleName: "SomeModule",
+                symbols: [
+                    makeSymbol(
+                        id: "some-symbol-id",
+                        kind: .typealias,
+                        pathComponents: ["SomeTypeAlias"],
+                        availability: [
+                            makeAvailabilityItem(
+                                domainName: "macOS",
+                                introduced: .init(major: 10, minor: 15, patch: 0),
+                                renamed: "SomeOtherTypeAlias",
+                                unconditionallyDeprecated: true
+                            ),
+                            makeAvailabilityItem(
+                                domainName: "iOS",
+                                introduced: .init(major: 13, minor: 0, patch: 0),
+                                renamed: "SomeOtherTypeAlias",
+                                unconditionallyDeprecated: true
+                            ),
+                        ]
+                    )
+                ]
+            )),
+        ])
+
+        let (_, context) = try await loadBundle(catalog: catalog)
+        let renderIndex = try generatedRenderIndex(
+            forIdentifier: "com.test.example",
+            inContext: context
+        )
+
+        let swiftNodes = try XCTUnwrap(renderIndex.interfaceLanguages["swift"])
+        let symbolNode = try XCTUnwrap(
+            findNode(titled: "SomeTypeAlias", in: swiftNodes)
+        )
+        XCTAssertTrue(
+            symbolNode.isDeprecated,
+            "Should be unconditionally deprecated"
         )
     }
 

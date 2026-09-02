@@ -50,7 +50,6 @@ class ConvertSubcommandTests: XCTestCase {
     }
 
     func testOptionsValidation() throws {
-        // create source bundle directory
         let sourceURL = try createTemporaryDirectory(named: "documentation")
         try "".write(to: sourceURL.appendingPathComponent("Info.plist"), atomically: true, encoding: .utf8)
         
@@ -269,7 +268,7 @@ class ConvertSubcommandTests: XCTestCase {
                 testBundleURL.path,
             ])
 
-            XCTAssertEqual(convertOptions.bundleDiscoveryOptions.additionalSymbolGraphFiles.map { $0.lastPathComponent }.sorted(), [
+            XCTAssertEqual(convertOptions.catalogDiscoveryOptions.additionalSymbolGraphFiles.map { $0.lastPathComponent }.sorted(), [
                 "FillIntroduced.symbols.json",
                 "MyKit@SideKit.symbols.json",
                 "mykit-iOS.symbols.json",
@@ -317,7 +316,7 @@ class ConvertSubcommandTests: XCTestCase {
         let action = try ConvertAction(fromConvertCommand: convertOptions)
         XCTAssertNil(action.rootURL)
         
-        XCTAssertEqual(convertOptions.bundleDiscoveryOptions.additionalSymbolGraphFiles.map { $0.lastPathComponent }.sorted(), [
+        XCTAssertEqual(convertOptions.catalogDiscoveryOptions.additionalSymbolGraphFiles.map { $0.lastPathComponent }.sorted(), [
             "FillIntroduced.symbols.json",
             "MyKit@SideKit.symbols.json",
             "mykit-iOS.symbols.json",
@@ -617,6 +616,29 @@ class ConvertSubcommandFlagParsingTests {
         let conflictingSeverity = try Docc.Convert.parse(["--Wwarning", "First", "--Werror", "First", "--Werror", "Second"])
         #expect(conflictingSeverity.diagnosticOptions.warningGroupsWithErrorSeverity   == ["Second"], "'First' is excluded from both lists")
         #expect(conflictingSeverity.diagnosticOptions.warningGroupsWithWarningSeverity == [],         "'First' is excluded from both lists")
+    }
+    
+    @Test
+    func parsingOutputFormat() throws {
+        // The feature is enabled when no flag is passed.
+        let noFlagConvert = try Docc.Convert.parse([])
+        #expect(noFlagConvert.inputsAndOutputs.outputFormat == .json)
+        
+        // It's allowed (but redundant) to explicitly specify "json" as the output format
+        let redundantJSONOutput = try Docc.Convert.parse(["--output-format", "json"])
+        #expect(redundantJSONOutput.inputsAndOutputs.outputFormat == .json)
+        
+        // At this stage, the static HTML output format is spelled very verbosely and explicitly to dissuade general usage (in addition to the option is hidden)
+        let htmlOutput = try Docc.Convert.parse(["--output-format", "experimental-html-for-development"])
+        #expect(htmlOutput.inputsAndOutputs.outputFormat == .experimentalHTML)
+        
+        // Any shorter and less explicit spelling raises an error.
+        #expect(throws: (any Error).self) {
+            try Docc.Convert.parse(["--output-format", "experimental-html"])
+        }
+        #expect(throws: (any Error).self) {
+            try Docc.Convert.parse(["--output-format", "html"])
+        }
     }
     
     // This test calls ``ConvertOptions.infoPlistFallbacks._unusedVersionForBackwardsCompatibility`` which is deprecated.

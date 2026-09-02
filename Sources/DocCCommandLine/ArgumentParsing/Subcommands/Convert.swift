@@ -83,6 +83,10 @@ extension Docc {
                     }
                 }
             }
+            
+            /// The format that the convert action will output the documentation in when writing to the specific output location.
+            @Option(name: .long, help: .hidden)
+            var outputFormat: OutputFormat = .json
         }
         
         /// The path to the directory that all build output should be placed in.
@@ -323,9 +327,9 @@ extension Docc {
             )
             var defaultCodeListingLanguage: String?
         
-            /// A user-provided fallback display name for the documentation bundle.
+            /// A user-provided fallback display name for the documentation inputs.
             ///
-            /// If the documentation catalogs's Info.plist file contains a bundle display name, the documentation catalog ignores this fallback name.
+            /// If the documentation catalogs's Info.plist file contains a "bundle display name", the documentation catalog ignores this fallback name.
             @Option(
                 name: [.customLong("fallback-display-name"), .customLong("display-name")], // Remove spelling without "fallback" prefix when other tools no longer use it. (rdar://72449411)
                 help: ArgumentHelp("A fallback display name if no value is provided in the documentation catalogs's Info.plist file.", discussion: """
@@ -336,14 +340,14 @@ extension Docc {
             )
             var fallbackBundleDisplayName: String?
         
-            /// A user-provided fallback identifier for the documentation bundle.
+            /// A user-provided fallback identifier for the documentation inputs.
             ///
-            /// If the documentation catalogs's Info.plist file contains a bundle identifier, the documentation catalog ignores this fallback identifier.
+            /// If the documentation catalogs's Info.plist file contains a "bundle identifier", the documentation catalog ignores this fallback identifier.
             @Option(
                 name: [.customLong("fallback-bundle-identifier"), .customLong("bundle-identifier")], // Remove spelling without "fallback" prefix when other tools no longer use it. (rdar://72449411)
                 help: ArgumentHelp("A fallback bundle identifier if no value is provided in the documentation catalogs's Info.plist file.", discussion: """
-                If no bundle identifier is provided in the catalogs's Info.plist file or via the '--fallback-bundle-identifier' option, \
-                DocC will infer a bundle identifier from the display name.
+                If no identifier is provided in the catalogs's Info.plist file or via the '--fallback-bundle-identifier' option, \
+                DocC will infer an identifier from the display name.
                 """)
             )
             var fallbackBundleIdentifier: String?
@@ -363,7 +367,7 @@ extension Docc {
                 name: [.customLong("fallback-bundle-version"), .customLong("bundle-version")],
                 help: .hidden
             )
-            @available(*, deprecated, message: "The bundle version isn't used for anything.")
+            @available(*, deprecated, message: "The version isn't used for anything.")
             var _unusedVersionForBackwardsCompatibility: String?
             
             func validate() throws {
@@ -612,6 +616,32 @@ extension Docc {
                 DiagnosticConsoleWriter.formattedDescription(for: diagnostic, options: _diagnosticFormattingOptions),
                 to: &_errorLogHandle
             )
+        }
+        
+        /// The possible output (file) formats that the convert action can use for the documentation output.
+        package enum OutputFormat: ExpressibleByArgument {
+            /// Output each page as a JSON file---in the format described in RenderNode.spec.json---to be consumed by Swift-DocC Render.
+            case json
+            /// Output each page as a static HTML file.
+            case experimentalHTML
+            
+            package init?(argument: String) {
+                switch argument {
+                    case "json": self = .json
+                    
+                    // This spelling is meant to indicate that this feature is not suitable for general use.
+                    // As this start to approach being complete enough to a viable alternative output format,
+                    // the plan is to rename this to only "experimental-html" and post a pitch about the broader feature to the Swift Forums.
+                    case "experimental-html-for-development":
+                        self = .experimentalHTML
+                    
+                    default: return nil
+                }
+            }
+            
+            package static var allValueStrings: [String] {
+                ["json", "experimental-html-for-development"]
+            }
         }
     }
 }

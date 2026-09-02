@@ -1,26 +1,21 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2025-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
  See https://swift.org/CONTRIBUTORS.txt for Swift project authors
 */
 
-#if canImport(FoundationXML)
-// TODO: Consider other HTML rendering options as a future improvement (rdar://165755530)
-import FoundationXML
-import FoundationEssentials
-#else
-import Foundation
-#endif
-
+import struct Foundation.URL
+import struct Foundation.Data
 import SwiftDocC
-private import DocCHTML
+import DocCHTML
 
 struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
     var prettyPrintOutput: Bool
+    let _isPrimaryOutputFormat = false
     
     private struct HTMLTemplate {
         var original: String
@@ -54,10 +49,10 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
             {
                 titleReplacementRange = titleStart ..< titleEnd
             } else {
-                content.insert(contentsOf: "<title></title>", at: beforeEndOfHead)
-                content.utf8.formIndex(&beforeEndOfHead,  offsetBy: "<title></title>".utf8.count)
-                content.utf8.formIndex(&afterStartOfBody, offsetBy: "<title></title>".utf8.count)
-                let titleInside = content.utf8.index(beforeEndOfHead, offsetBy: -"</title>".utf8.count)
+                content.insert(contentsOf: "<title></title>\n", at: beforeEndOfHead)
+                content.utf8.formIndex(&beforeEndOfHead,  offsetBy: "<title></title>\n".utf8.count)
+                content.utf8.formIndex(&afterStartOfBody, offsetBy: "<title></title>\n".utf8.count)
+                let titleInside = content.utf8.index(beforeEndOfHead, offsetBy: -"</title>\n".utf8.count)
                 titleReplacementRange = titleInside ..< titleInside
             }
             
@@ -66,7 +61,7 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
             {
                 contentReplacementRange = noScriptStart ..< noScriptEnd
             } else {
-                content.insert(contentsOf: "<noscript></noscript>", at: afterStartOfBody)
+                content.insert(contentsOf: "<noscript></noscript>\n", at: afterStartOfBody)
                 let noScriptInside = content.utf8.index(afterStartOfBody, offsetBy: "<noscript>".utf8.count)
                 contentReplacementRange = noScriptInside ..< noScriptInside
             }
@@ -79,7 +74,7 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
         }
         
         func makeContent(
-            content: XMLNode,
+            content: HTMLNode,
             title: String,
             plainDescription: String?,
             prettyPrint: Bool
@@ -88,15 +83,16 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
             // Replace the content in reverse order so that the earlier ranges remain valid.
             copy.replaceSubrange(contentReplacementRange, with: content.rendered(prettyPrinted: prettyPrint))
             if let plainDescription {
-                let metaDescription = XMLNode.element(named: "meta", attributes: ["name": "description", "content": plainDescription])
+                let metaDescription = meta(.content(plainDescription), .name("description"))
                 copy.replaceSubrange(descriptionReplacementRange, with: metaDescription.rendered(prettyPrinted: prettyPrint))
             }
-            copy.replaceSubrange(titleReplacementRange,   with: title)
+            copy.replaceSubrange(titleReplacementRange, with: title)
             
             return copy
         }
     }
     private var htmlTemplate: HTMLTemplate
+    // FIXME: Extract the file writing (and directory creation) functionality from this RenderNode (JSON) specific type.
     private let fileWriter: JSONEncodingRenderNodeWriter
     
     init(
@@ -133,7 +129,7 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
     }
     
     func consume(
-        mainContent: XMLNode,
+        mainContent: HTMLNode,
         metadata: (title: String, description: String?),
         forPage reference: ResolvedTopicReference
     ) throws {
@@ -149,12 +145,9 @@ struct FileWritingHTMLContentConsumer: HTMLContentConsumer {
     }
 }
 
-private extension XMLNode {
+private extension HTMLNode {
     func rendered(prettyPrinted: Bool) -> String {
-        if prettyPrinted {
-            xmlString(options: [.nodePrettyPrint, .nodeCompactEmptyElement])
-        } else {
-            xmlString(options: .nodeCompactEmptyElement)
-        }
+        let data = HTMLFormatter.format(self, options: prettyPrinted ? .prettyPrint : [])
+        return String(decoding: data, as: UTF8.self)
     }
 }

@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2021-2024 Apple Inc. and the Swift project authors
+ Copyright (c) 2021-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -80,17 +80,19 @@ public struct VideoReference: MediaReference, URLReference, Equatable {
         
         // convert the data asset to a serializable object
         var result = [VariantProxy]()
-        for (key, value) in asset.variants.sorted(by: \.value.path) {
+        for (key, value) in asset.variants {
             let url = renderURL(for: value, prefixComponent: encoder.assetPrefixComponent)
             result.append(VariantProxy(url: url, traits: key))
         }
+        result.sort(by: VariantProxy.areInIncreasingOrder)
+
         try container.encode(result, forKey: .variants)
         
         try container.encode(poster, forKey: .poster)
     }
     
     /// A codable proxy value that the video reference uses to serialize information about its asset variants.
-    public struct VariantProxy: Codable, Equatable {
+    public struct VariantProxy: MediaVariantProxy, Codable, Equatable {
         /// The URL to the file for this video variant.
         public var url: URL
         /// The traits of this video reference.

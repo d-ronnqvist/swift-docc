@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2025-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -40,12 +40,12 @@ struct MarkdownOutputSemanticVisitor: SemanticVisitor {
 }
 
 extension MarkdownOutputNode.Metadata {
-    init(documentType: DocumentType, bundle: DocumentationBundle, reference: ResolvedTopicReference, title: String) {
+    init(documentType: DocumentType, inputs: DocumentationContext.Inputs, reference: ResolvedTopicReference, title: String) {
         self.init(
             documentType: documentType,
             identifier: reference.path,
             title: title,
-            framework: bundle.displayName
+            framework: inputs.displayName
         )
     }
 }
@@ -58,14 +58,7 @@ extension MarkdownOutputSemanticVisitor {
     }
     
     mutating func add(fallbackTarget: String, type: MarkdownOutputManifest.RelationshipType, subtype: RelationshipsGroup.Kind?) {
-        let targetIdentifier: String
-        let components = fallbackTarget.components(separatedBy: ".")
-        if components.count > 1 {
-            targetIdentifier = "/documentation/\(components.joined(separator: "/"))"
-        } else {
-            targetIdentifier = fallbackTarget
-        }
-        add(targetIdentifier: targetIdentifier, type: type, subtype: subtype)
+        add(targetIdentifier: fallbackTarget, type: type, subtype: subtype)
     }
     
     mutating func add(targetIdentifier: String, type: MarkdownOutputManifest.RelationshipType, subtype: RelationshipsGroup.Kind?) {
@@ -74,11 +67,72 @@ extension MarkdownOutputSemanticVisitor {
     }
 }
 
+// MARK: - Automatic curation
+
+extension MarkdownOutputSemanticVisitor {
+
+    /// The variant trait to generate automatic curation for.
+    ///
+    /// Unlike render nodes, which describe every language representation of a page in a single document, the markdown
+    /// output only describes the page's primary language, so only that language's curation is included.
+    var automaticCurationTrait: DocumentationDataVariantsTrait {
+        DocumentationDataVariantsTrait(sourceLanguage: documentationNode.sourceLanguage)
+    }
+
+    /// Renders automatically generated task groups, adding a "Topics" heading if the page doesn't already have one.
+    ///
+    /// Each group becomes a level 3 heading followed by a link to each of its references, in the same "link, then abstract"
+    /// format as an authored link list. Empty groups—and the "Topics" heading itself—are only rendered if there's something to render.
+    ///
+    /// - Parameters:
+    ///   - groups: The automatically generated task groups to render, in the order they should appear.
+    ///   - hasTopicsHeading: Whether the page already has a "Topics" heading. If it doesn't, and this call renders any
+    ///     groups, a heading is added and this value is set to `true` so that later calls don't add a second one.
+    mutating func visit(automaticTaskGroups groups: [AutomaticCuration.TaskGroup], hasTopicsHeading: inout Bool) {
+        let groups = groups.filter { !$0.references.isEmpty }
+        guard !groups.isEmpty else { return }
+
+        if !hasTopicsHeading {
+            markdownWalker.visit(Heading(level: 2, Text("Topics")))
+            hasTopicsHeading = true
+        }
+
+        // Copied to a local because the walker requires exclusive access to `self` for the duration of the closure below.
+        let context = self.context
+        markdownWalker.withRenderingLinkList {
+            for group in groups {
+                // Automatically generated task groups always have a title.
+                $0.visit(Heading(level: 3, Text(group.title ?? "Symbols")))
+                for reference in group.references {
+                    // Rendering the reference as markup—instead of formatting a link directly—reuses the walker's link
+                    // handling, which resolves the link's title, appends the target's abstract, and records the
+                    // "belongs to topic" relationship for the manifest.
+                    if context.documentationCache[reference]?.semantic is Symbol {
+                        $0.visit(Paragraph(SymbolLink(destination: reference.absoluteString)))
+                    } else {
+                        $0.visit(Paragraph(Link(destination: reference.absoluteString)))
+                    }
+                }
+            }
+        }
+    }
+
+    /// The automatically generated task groups for the given automatic task group sections with the given render position preference.
+    func automaticTaskGroups(
+        _ sections: [AutomaticTaskGroupSection],
+        at position: AutomaticTaskGroupSection.PositionPreference
+    ) -> [AutomaticCuration.TaskGroup] {
+        sections
+            .filter { $0.renderPositionPreference == position }
+            .map { (title: $0.title, references: $0.references) }
+    }
+}
+
 // MARK: Article Output
 extension MarkdownOutputSemanticVisitor {
     
     mutating func visitArticle(_ article: Article) -> MarkdownOutputNode? {
-        var metadata = MarkdownOutputNode.Metadata(documentType: .article, bundle: context.inputs, reference: identifier, title: article.title?.plainText ?? identifier.lastPathComponent)
+        var metadata = MarkdownOutputNode.Metadata(documentType: .article, inputs: context.inputs, reference: identifier, title: article.title?.plainText ?? identifier.lastPathComponent)
                 
         let document = MarkdownOutputManifest.Document(
             identifier: identifier.path,
@@ -100,11 +154,48 @@ extension MarkdownOutputSemanticVisitor {
         
         // Only care about references from these sections
         markdownWalker.outgoingReferences = []
+        let markdownBeforeTopics = markdownWalker.markdown
         markdownWalker.withRenderingLinkList {
             $0.visit(section: article.topics, addingHeading: "Topics")
+        }
+        // The walker reverts a section that turns out to have no content, so comparing the markdown is the only reliable
+        // way to know whether an authored "Topics" heading was added.
+        var hasTopicsHeading = markdownWalker.markdown != markdownBeforeTopics
+
+        // Place "top" rendering preference automatic task groups after any authored task groups but before automatic curation.
+        visit(
+            automaticTaskGroups: automaticTaskGroups(article.automaticTaskGroups, at: .top),
+            hasTopicsHeading: &hasTopicsHeading
+        )
+
+        // If there's no authored curation and no automatic task groups, curate this page's children in groups named after
+        // their kind, matching `RenderNodeTranslator.visitArticle(_:)`.
+        if article.topics?.taskGroups.isEmpty ?? true, article.automaticTaskGroups.isEmpty {
+            let alreadyCurated = Set(markdownWalker.outgoingReferences.map(\.sourceIdentifier))
+            let generatedGroups = (try? AutomaticCuration.topics(
+                for: documentationNode,
+                withTraits: [automaticCurationTrait],
+                context: context
+            ))?.compactMap { group -> AutomaticCuration.TaskGroup? in
+                // Remove references that have already been curated, and groups left with no references.
+                let references = group.references.filter { !alreadyCurated.contains($0.path) }
+                guard !references.isEmpty else { return nil }
+                return (title: group.title, references: references)
+            } ?? []
+
+            visit(automaticTaskGroups: generatedGroups, hasTopicsHeading: &hasTopicsHeading)
+        }
+
+        // Place "bottom" rendering preference automatic task groups after automatic curation.
+        visit(
+            automaticTaskGroups: automaticTaskGroups(article.automaticTaskGroups, at: .bottom),
+            hasTopicsHeading: &hasTopicsHeading
+        )
+
+        markdownWalker.withRenderingLinkList {
             $0.visit(section: article.seeAlso, addingHeading: "See Also")
         }
-        
+
         manifest?.relationships.formUnion(markdownWalker.outgoingReferences)
         return MarkdownOutputNode(metadata: metadata, markdown: markdownWalker.markdown)
     }
@@ -116,10 +207,10 @@ import Markdown
 extension MarkdownOutputSemanticVisitor {
     
     mutating func visitSymbol(_ symbol: Symbol) -> MarkdownOutputNode? {
-        let bundle = context.inputs
-        var metadata = MarkdownOutputNode.Metadata(documentType: .symbol, bundle: bundle, reference: identifier, title: symbol.title)
+        let inputs = context.inputs
+        var metadata = MarkdownOutputNode.Metadata(documentType: .symbol, inputs: inputs, reference: identifier, title: symbol.title)
         
-        metadata.symbol = .init(symbol, context: context, bundle: bundle)
+        metadata.symbol = .init(symbol, context: context)
         metadata.role = symbol.kind.displayName
         
         let document = MarkdownOutputManifest.Document(
@@ -127,19 +218,22 @@ extension MarkdownOutputSemanticVisitor {
             documentType: .symbol,
             title: metadata.title
         )
-        manifest = MarkdownOutputManifest(title: bundle.displayName, documents: [document])
+        manifest = MarkdownOutputManifest(title: inputs.displayName, documents: [document])
         
         // Availability - defaults, overridden with symbol, overridden with metadata
         
         var availabilities: [String: MarkdownOutputNode.Metadata.Availability] = [:]
-        if let primaryModule = metadata.symbol?.modules.first {
-            for availability in bundle.info.defaultAvailability?.modules[primaryModule] ?? [] {
+        
+        let symbolAvailability = symbol.availability?.availability ?? []
+        // Framework defaults only apply if there are no specific availabilities at symbol level.
+        if !symbolAvailability.contains(where: { $0.domain != nil }), let primaryModule = metadata.symbol?.modules.first {
+            for availability in inputs.info.defaultAvailability?.modules[primaryModule] ?? [] {
                 let meta = MarkdownOutputNode.Metadata.Availability(availability)
                 availabilities[meta.platform] = meta
             }
         }
-         
-        for availability in symbol.availability?.availability ?? [] {
+        
+        for availability in symbolAvailability {
             let meta = MarkdownOutputNode.Metadata.Availability(availability)
             availabilities[meta.platform] = meta
         }
@@ -177,21 +271,68 @@ extension MarkdownOutputSemanticVisitor {
         markdownWalker.visit(section: symbol.discussion, addingHeading: symbol.kind.identifier.swiftSymbolCouldHaveChildren ? "Overview" : "Discussion")
         
         markdownWalker.outgoingReferences = []
+        let markdownBeforeTopics = markdownWalker.markdown
         markdownWalker.withRenderingLinkList {
             $0.visit(section: symbol.topics, addingHeading: "Topics")
+        }
+        // The walker reverts a section that turns out to have no content, so comparing the markdown is the only reliable
+        // way to know whether an authored "Topics" heading was added.
+        var hasTopicsHeading = markdownWalker.markdown != markdownBeforeTopics
+
+        let automaticTaskGroupSections = symbol.automaticTaskGroupsVariants[automaticCurationTrait] ?? []
+
+        // Place "top" rendering preference automatic task groups after any authored task groups but before automatic curation.
+        visit(
+            automaticTaskGroups: automaticTaskGroups(automaticTaskGroupSections, at: .top),
+            hasTopicsHeading: &hasTopicsHeading
+        )
+
+        // Children of this symbol that haven't been curated manually are curated in groups named after their kind,
+        // matching `RenderNodeTranslator.visitSymbol(_:)`.
+        //
+        // Unlike render nodes, a generated group whose title matches an authored section is rendered as a separate group
+        // rather than merged into the authored one (rdar://61899214). Both groups link to the same anchor, so the
+        // manifest relationships are unaffected.
+        let generatedGroups = (try? AutomaticCuration.topics(
+            for: documentationNode,
+            withTraits: [automaticCurationTrait],
+            context: context
+        )) ?? []
+        visit(automaticTaskGroups: generatedGroups, hasTopicsHeading: &hasTopicsHeading)
+
+        // Place "bottom" rendering preference automatic task groups after automatic curation.
+        visit(
+            automaticTaskGroups: automaticTaskGroups(automaticTaskGroupSections, at: .bottom),
+            hasTopicsHeading: &hasTopicsHeading
+        )
+
+        markdownWalker.withRenderingLinkList {
             $0.visit(section: symbol.seeAlso, addingHeading: "See Also")
         }
         
         manifest?.relationships.formUnion(markdownWalker.outgoingReferences)
         
+        if symbol.relationships.groups.isEmpty == false {
+            markdownWalker.visit(Heading(level: 2, Text(RelationshipsSection.title)))
+        }
         for relationshipGroup in symbol.relationships.groups {
+            markdownWalker.visit(Heading(level: 3, Text(relationshipGroup.sectionTitle)))
             for destination in relationshipGroup.destinations {
                 switch context.resolve(destination, in: identifier) {
                 case .success(let resolved):
+                    // Add the relationship to the manifest
                     add(target: resolved, type: .relatedSymbol, subtype: relationshipGroup.kind)
+                    
+                    // Add the relationship to the markdown
+                    markdownWalker.startNewParagraphIfRequired()
+                    let link = Link(destination: resolved.path, title: resolved.lastPathComponent, [InlineCode(resolved.lastPathComponent)])
+                    markdownWalker.defaultVisit(link)
+                    
                 case .failure:
                     if let fallback = symbol.relationships.targetFallbacks[destination] {
                         add(fallbackTarget: fallback, type: .relatedSymbol, subtype: relationshipGroup.kind)
+                        markdownWalker.startNewParagraphIfRequired()
+                        markdownWalker.defaultVisit(InlineCode(fallback))
                     }
                 }
             }
@@ -205,7 +346,7 @@ extension MarkdownOutputSemanticVisitor {
 import SymbolKit
 
 private extension MarkdownOutputNode.Metadata.Symbol {
-    init(_ symbol: SwiftDocC.Symbol, context: DocumentationContext, bundle: DocumentationBundle) {
+    init(_ symbol: SwiftDocC.Symbol, context: DocumentationContext) {
                 
         // Gather modules
         var modules = [String]()
@@ -266,7 +407,7 @@ extension MarkdownOutputSemanticVisitor {
     
     mutating func visitTutorial(_ tutorial: Tutorial) -> MarkdownOutputNode? {
         let title = tutorial.intro.title.isEmpty ? identifier.lastPathComponent : tutorial.intro.title
-        let metadata = MarkdownOutputNode.Metadata(documentType: .tutorial, bundle: context.inputs, reference: identifier, title: title)
+        let metadata = MarkdownOutputNode.Metadata(documentType: .tutorial, inputs: context.inputs, reference: identifier, title: title)
         
         let document = MarkdownOutputManifest.Document(
             identifier: identifier.path,

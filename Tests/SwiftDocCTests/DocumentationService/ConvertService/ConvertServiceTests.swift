@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2021-2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2021-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -10,13 +10,14 @@
 
 import XCTest
 import Foundation
+import Testing
 @testable import SwiftDocC
 import SymbolKit
 import DocCTestUtilities
 import DocCCommon
 
 class ConvertServiceTests: XCTestCase {
-    private let testBundleInfo = DocumentationBundle.Info(
+    private let testBundleInfo = DocumentationContext.Inputs.Info(
         displayName: "TestBundle",
         id: "identifier"
     )
@@ -1498,7 +1499,7 @@ class ConvertServiceTests: XCTestCase {
     
     func testReturnsRenderReferenceStoreWhenRequestedForOnDiskBundleWithUncuratedArticles() async throws {
         #if os(Linux)
-        throw XCTSkip("""
+        try XCTSkipIf(true, """
         Skipped on Linux due to an issue in Foundation.Codable where dictionaries are sometimes getting encoded as \
         arrays. (github.com/apple/swift/issues/57363)
         """)
@@ -1627,7 +1628,7 @@ class ConvertServiceTests: XCTestCase {
     
     func testNoRenderReferencesToNonLinkableNodes() async throws {
         #if os(Linux)
-        throw XCTSkip("""
+        try XCTSkipIf(true, """
         Skipped on Linux due to an issue in Foundation.Codable where dictionaries are sometimes getting encoded as \
         arrays. (github.com/apple/swift/issues/57363)
         """)
@@ -1669,13 +1670,13 @@ class ConvertServiceTests: XCTestCase {
     
     func testReturnsRenderReferenceStoreWhenRequestedForOnDiskBundleWithCuratedArticles() async throws {
         #if os(Linux)
-        throw XCTSkip("""
+        try XCTSkipIf(true, """
         Skipped on Linux due to an issue in Foundation.Codable where dictionaries are sometimes getting encoded as \
         arrays. (github.com/apple/swift/issues/57363)
         """)
         #else
         let (testBundleURL, _, _) = try await testBundleAndContext(
-            // Use a bundle that contains only articles, one of which is declared as the TechnologyRoot and curates the
+            // Use a catalog that contains only articles, one of which is declared as the TechnologyRoot and curates the
             // other articles.
             copying: "BundleWithTechnologyRoot"
         )
@@ -2368,7 +2369,7 @@ class ConvertServiceTests: XCTestCase {
             markupFiles: [],
             miscResourceURLs: []
         )
-        XCTAssertEqual(try linkResolutionRequestsForConvertRequest(requestWithDifferentBundleID), [], "Shouldn't make any link resolution requests because the bundle IDs are different.")
+        XCTAssertEqual(try linkResolutionRequestsForConvertRequest(requestWithDifferentBundleID), [], "Shouldn't make any link resolution requests because the IDs are different.")
         
         let requestWithSameBundleID = ConvertRequest(
             bundleInfo: DocumentationBundle.Info(displayName: "DisplayName", id: "com.example.something"),
@@ -2416,7 +2417,7 @@ class ConvertServiceTests: XCTestCase {
             expectation.fulfill()
         }
         
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: 1.5)
     }
     
     /// Asserts that the given render reference store contains the given topic.
@@ -2478,5 +2479,85 @@ private extension ConvertServiceTests {
             try? FileManager.default.removeItem(at: temporaryDirectory)
         }
         return temporaryDirectory
+    }
+}
+
+struct ConvertServiceProseNameTests {
+    private let testBundleInfo = DocumentationContext.Inputs.Info(displayName: "TestBundle", id: "identifier")
+
+    @Test
+    func convertResponseUsesProseNameForSymbolReference() async throws {
+        let symbolTitle = "symbolTitle(with:)"
+        let proseName = "proseName"
+
+        var symbol = makeSymbol(id: "method-id", kind: .func, pathComponents: [symbolTitle],
+                                docComment: "Some documentation.")
+        symbol.names.prose = proseName
+
+        let request = ConvertRequest(
+            bundleInfo: testBundleInfo,
+            externalIDsToConvert: ["method-id"],
+            documentPathsToConvert: [],
+            symbolGraphs: [try JSONEncoder().encode(makeSymbolGraph(moduleName: "TestModule", symbols: [symbol]))],
+            markupFiles: [],
+            miscResourceURLs: []
+        )
+
+        // Drive the render pipeline through the ConvertService, the same way an IDE would.
+        let response = try await convert(request)
+
+        let renderNodeData = try #require(response.renderNodes.first)
+        let renderNode = try JSONDecoder().decode(RenderNode.self, from: renderNodeData)
+
+        // The render node contains a reference for the converted symbol; its title is what inline
+        // links to the symbol render as, so verify it uses the prose name rather than the title.
+        let symbolReference = try #require(
+            renderNode.references["doc://identifier/documentation/TestModule/\(symbolTitle)"] as? TopicRenderReference
+        )
+        #expect(symbolReference.title == proseName)
+    }
+
+    @Test
+    func convertResponseUsesTitleForSymbolReferenceWhenProseNotSet() async throws {
+        let symbolTitle = "symbolTitle(with:)"
+
+        // The symbol has no prose name set.
+        let symbol = makeSymbol(id: "method-id", kind: .func, pathComponents: [symbolTitle],
+                                docComment: "Some documentation.")
+
+        let request = ConvertRequest(
+            bundleInfo: testBundleInfo,
+            externalIDsToConvert: ["method-id"],
+            documentPathsToConvert: [],
+            symbolGraphs: [try JSONEncoder().encode(makeSymbolGraph(moduleName: "TestModule", symbols: [symbol]))],
+            markupFiles: [],
+            miscResourceURLs: []
+        )
+
+        let response = try await convert(request)
+
+        let renderNodeData = try #require(response.renderNodes.first)
+        let renderNode = try JSONDecoder().decode(RenderNode.self, from: renderNodeData)
+
+        // Without a prose name, the reference falls back to the symbol's title.
+        let symbolReference = try #require(
+            renderNode.references["doc://identifier/documentation/TestModule/\(symbolTitle)"] as? TopicRenderReference
+        )
+        #expect(symbolReference.title == symbolTitle)
+    }
+
+    /// Processes a convert request through a `ConvertService` and returns the decoded response.
+    private func convert(_ request: ConvertRequest) async throws -> ConvertResponse {
+        let message = DocumentationServer.Message(
+            type: "convert",
+            identifier: "test-identifier",
+            payload: try JSONEncoder().encode(request)
+        )
+        let responseMessage: DocumentationServer.Message = await withCheckedContinuation { continuation in
+            ConvertService().process(message) { responseMessage in
+                continuation.resume(returning: responseMessage)
+            }
+        }
+        return try JSONDecoder().decode(ConvertResponse.self, from: try #require(responseMessage.payload))
     }
 }

@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift.org open source project
 
- Copyright (c) 2021-2025 Apple Inc. and the Swift project authors
+ Copyright (c) 2021-2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -15,13 +15,13 @@ public import DocCCommon
 
 // Link resolution works in two parts:
 //
-//  1. When DocC compiles a documentation bundle and encounters an "external" reference it will call out to
-//     resolve that reference using the external resolver that's been registered for that bundle identifier.
-//     The reference may be a page in another documentation bundle or a page from another source.
+//  1. When DocC compiles documentation inputs and encounters an "external" reference it will call out to
+//     resolve that reference using the external resolver that's been registered for that identifier.
+//     The reference may be a page in another documentation archive or a page from another source.
 //
-//  2. Once DocC has finished compiling the documentation bundle it will summarize all the pages and on-page
+//  2. Once DocC has finished compiling the documentation inputs it will summarize all the pages and on-page
 //     elements that can be linked to.
-//     This information is returned when another documentation bundle resolves a reference for that page.
+//     This information is returned when another documentation inputs resolves a reference for that page.
 //
 //
 //   DocC                                                                                           Backend endpoint
@@ -29,7 +29,7 @@ public import DocCCommon
 //  │ ┌──────────────────────────┐                             │                                   │                               │
 //  │ │                          │                             │                                   │                               │
 //  │ │   DocumentationContext   │                             │                                   │                               │
-//  │ │     Register bundle      │                             │                                   │                               │
+//  │ │     Register inputs      │                             │                                   │                               │
 //  │ │                          │                             │                                   │                               │
 //  │ └──────────────────────────┘       Resolve external      │                                   │                               │
 //  │               │                       references         │                                   │                               │
@@ -64,9 +64,9 @@ public import DocCCommon
 //  │                                                          │    └───────────────────────┘      │                               │
 //  └──────────────────────────────────────────────────────────┘                                   └───────────────────────────────┘
 
-/// A summary of an element that you can link to from outside the documentation bundle.
+/// A summary of an element that you can link to from outside the local documentation.
 ///
-/// The non-optional properties of this summary are all the information needed when another bundle references this element.
+/// The non-optional properties of this summary are all the information needed when another unit of documentation references this element.
 ///
 /// Various information from the summary is used depending on what content references the summarized element. For example:
 ///  - In a paragraph of text, a link to this element will use the ``title`` as the link text and style the tile in code font if the ``kind`` is a type of symbol.
@@ -121,32 +121,6 @@ public struct LinkDestinationSummary: Codable, Equatable {
     //  Adding new required properties is considered breaking change since existing external documentation sources
     //  wouldn't necessarily meet these new requirements.
     //  Make sure to update the encoding, decoding and Equatable implementations when adding new properties.
-
-    /// A collection of identifiers that all relate to some common task, as described by the title.
-    @available(*, deprecated, message: "Link summaries aren't meant as a source of _hierarchy_ information. This deprecated API will be removed after 6.4 is released.")
-    public struct TaskGroup: Codable, Equatable {
-        /// The title of this task group
-        public let title: String?
-        /// The identifiers of all the elements that are part of this task group.
-        public let identifiers: [String]
-        
-        /// Creates a new task group that lists a number of elements that relate to a common task.
-        ///
-        /// - Parameters:
-        ///   - title: The optional title for this task group.
-        ///   - identifiers: The identifiers of all the elements that are part of this task group.
-        public init(title: String?, identifiers: [String]) {
-            self.title = title
-            self.identifiers = identifiers
-        }
-    }
-    
-    /// The reference URLs of the summarized element's children, grouped by their task groups.
-    ///
-    /// - Note: It's possible for more than one task group to have the same title.
-    /// - Note: This property represents conceptual children. Since See Also sections conceptually represent siblings they should not be included.
-    @available(*, deprecated, message: "Link summaries aren't meant as a source of _hierarchy_ information. This deprecated API will be removed after 6.4 is released.")
-    public let taskGroups: [TaskGroup]? = nil
     
     /// The unique, precise identifier for this symbol that you use to reference it across different systems, or `nil` if the summarized element isn't a symbol.
     public let usr: String?
@@ -221,12 +195,6 @@ public struct LinkDestinationSummary: Codable, Equatable {
         /// If the summarized element has an abstract but the variant doesn't, this property will be `Optional.some(nil)`.
         public let abstract: VariantValue<Abstract?>
         
-        /// The taskGroups of the variant or `nil` if the taskGroups is the same as the summarized element.
-        ///
-        /// If the summarized element has task groups but the variant doesn't, this property will be `Optional.some(nil)`.
-        @available(*, deprecated, message: "Link summaries aren't meant as a source of _hierarchy_ information. This deprecated API will be removed after 6.4 is released.")
-        public let taskGroups: VariantValue<[TaskGroup]?> = nil
-        
         /// The precise symbol identifier of the variant or `nil` if the precise symbol identifier is the same as the summarized element.
         ///
         /// If the summarized element has a precise symbol identifier but the variant doesn't, this property will be `Optional.some(nil)`.
@@ -243,11 +211,6 @@ public struct LinkDestinationSummary: Codable, Equatable {
         ///
         /// If the summarized element has a declaration but the variant doesn't, this property will be `Optional.some(nil)`.
         public let subheadingDeclarationFragments: VariantValue<DeclarationFragments?>
-        
-        @available(*, deprecated, renamed: "subheadingDeclarationFragments", message: "Use 'subheadingDeclarationFragments' instead. This deprecated API will be removed after 6.4 is released.")
-        public var declarationFragments: VariantValue<DeclarationFragments?> {
-            subheadingDeclarationFragments
-        }
 
         /// The simplified "navigator" declaration fragments for this symbol,  or `nil` if the navigator title is the same as the summarized element.
         public var navigatorDeclarationFragments: VariantValue<DeclarationFragments?> {
@@ -262,12 +225,6 @@ public struct LinkDestinationSummary: Codable, Equatable {
         ///
         /// If the summarized element has a navigator title but the variant doesn't, this property will be `Optional.some(nil)`.
         public let navigatorTitle: VariantValue<String?>
-
-        /// Images that are used to represent the summarized element or `nil` if the images are the same as the summarized element.
-        ///
-        /// If the summarized element has an image but the variant doesn't, this property will be `Optional.some(nil)`.
-        @available(*, deprecated, message: "`TopicRenderReference` doesn't support variant specific topic images. This property will be removed after 6.4 is released")
-        public let topicImages: VariantValue<[TopicImage]?> = nil
         
         /// Creates a new summary variant with the values that are different from the main summarized values.
         /// 
@@ -333,66 +290,6 @@ public struct LinkDestinationSummary: Codable, Equatable {
                 navigatorTitle: navigatorDeclarationFragments.map { fragments in
                     fragments.map { $0.map(\.text).joined() }
                 }
-            )
-        }
-        
-        @available(*, deprecated, renamed: "init(traits:kind:language:relativePresentationURL:title:abstract:usr:plainTextDeclaration:subheadingDeclarationFragments:navigatorDeclarationFragments:)", message: "Link summaries aren't meant as a source of _hierarchy_ information. This deprecated API will be removed after 6.4 is released.")
-        public init(
-            traits: [RenderNode.Variant.Trait],
-            kind: VariantValue<DocumentationNode.Kind> = nil,
-            language: VariantValue<SourceLanguage> = nil,
-            relativePresentationURL: VariantValue<URL> = nil,
-            title: VariantValue<String> = nil,
-            abstract: VariantValue<LinkDestinationSummary.Abstract?> = nil,
-            taskGroups _: VariantValue<[LinkDestinationSummary.TaskGroup]?> = nil,
-            usr: VariantValue<String?> = nil,
-            plainTextDeclaration: VariantValue<String?> = nil,
-            subheadingDeclarationFragments: VariantValue<LinkDestinationSummary.DeclarationFragments?> = nil,
-            navigatorDeclarationFragments: VariantValue<LinkDestinationSummary.DeclarationFragments?> = nil
-        ) {
-            self.init(
-                traits: traits,
-                kind: kind,
-                language: language,
-                relativePresentationURL: relativePresentationURL,
-                title: title,
-                abstract: abstract,
-                usr: usr,
-                plainTextDeclaration: plainTextDeclaration,
-                subheadingDeclarationFragments: subheadingDeclarationFragments,
-                navigatorTitle: navigatorDeclarationFragments.map { fragments in
-                    fragments.map { $0.map(\.text).joined() }
-                }
-            )
-        }
-        
-        @available(*, deprecated, renamed: "init(traits:kind:language:relativePresentationURL:title:abstract:taskGroups:usr:plainTextDeclaration:subheadingDeclarationFragments:navigatorDeclarationFragments:)", message: "Use `init(traits:kind:language:relativePresentationURL:title:abstract:taskGroups:usr:plainTextDeclaration:subheadingDeclarationFragments:navigatorDeclarationFragments:)` instead. `TopicRenderReference` doesn't support variant specific topic images. This property will be removed after 6.4 is released")
-        public init(
-            traits: [RenderNode.Variant.Trait],
-            kind: VariantValue<DocumentationNode.Kind> = nil,
-            language: VariantValue<SourceLanguage> = nil,
-            relativePresentationURL: VariantValue<URL> = nil,
-            title: VariantValue<String> = nil,
-            abstract: VariantValue<LinkDestinationSummary.Abstract?> = nil,
-            taskGroups: VariantValue<[LinkDestinationSummary.TaskGroup]?> = nil,
-            usr: VariantValue<String?> = nil,
-            plainTextDeclaration: VariantValue<String?> = nil,
-            declarationFragments: VariantValue<LinkDestinationSummary.DeclarationFragments?> = nil,
-            navigatorDeclarationFragments: VariantValue<LinkDestinationSummary.DeclarationFragments?> = nil,
-            topicImages: VariantValue<[TopicImage]?> = nil
-        ) {
-            self.init(
-                traits: traits,
-                kind: kind,
-                language: language,
-                relativePresentationURL: relativePresentationURL,
-                title: title,
-                abstract: abstract,
-                taskGroups: taskGroups,
-                usr: usr,
-                plainTextDeclaration: plainTextDeclaration,
-                subheadingDeclarationFragments: declarationFragments,
-                navigatorDeclarationFragments: navigatorDeclarationFragments
             )
         }
     }
@@ -497,93 +394,12 @@ public struct LinkDestinationSummary: Codable, Equatable {
             variants: variants
         )
     }
-    
-    @available(*, deprecated, renamed: "init(kind:language:relativePresentationURL:referenceURL:title:abstract:availableLanguages:isDeprecated:isBeta:usr:plainTextDeclaration:subheadingDeclarationFragments:navigatorTitle:redirects:topicImages:references:variants:)", message: "Link summaries aren't meant as a source of _hierarchy_ information. This deprecated API will be removed after 6.4 is released.")
-    @_disfavoredOverload
-    public init(
-        kind: DocumentationNode.Kind,
-        language: SourceLanguage,
-        relativePresentationURL: URL,
-        referenceURL: URL, title: String,
-        abstract: LinkDestinationSummary.Abstract? = nil,
-        availableLanguages: Set<SourceLanguage>,
-        platforms: [LinkDestinationSummary.PlatformAvailability]? = nil,
-        taskGroups _: [LinkDestinationSummary.TaskGroup]? = nil,
-        usr: String? = nil,
-        plainTextDeclaration: String? = nil,
-        subheadingDeclarationFragments: LinkDestinationSummary.DeclarationFragments? = nil,
-        navigatorDeclarationFragments: LinkDestinationSummary.DeclarationFragments? = nil,
-        redirects: [URL]? = nil,
-        topicImages: [TopicImage]? = nil,
-        references: [any RenderReference]? = nil,
-        variants: [LinkDestinationSummary.Variant]
-    ) {
-        self.init(
-            kind: kind,
-            language: language,
-            relativePresentationURL: relativePresentationURL,
-            referenceURL: referenceURL,
-            title: title,
-            abstract: abstract,
-            availableLanguages: availableLanguages,
-            platforms: platforms,
-            usr: usr,
-            plainTextDeclaration: plainTextDeclaration,
-            subheadingDeclarationFragments: subheadingDeclarationFragments,
-            navigatorDeclarationFragments: navigatorDeclarationFragments,
-            redirects: redirects,
-            topicImages: topicImages,
-            references: references,
-            variants: variants
-        )
-    }
-    
-    @available(*, deprecated, renamed: "init(kind:language:relativePresentationURL:referenceURL:title:abstract:availableLanguages:isDeprecated:isBeta:usr:plainTextDeclaration:subheadingDeclarationFragments:navigatorTitle:redirects:topicImages:references:variants:)", message: "Use 'init(kind:language:relativePresentationURL:referenceURL:title:abstract:availableLanguages:isDeprecated:isBeta:usr:plainTextDeclaration:subheadingDeclarationFragments:navigatorTitle:redirects:topicImages:references:variants:)' instead. This property will be removed after 6.4 is released")
-    @_disfavoredOverload
-    public init(
-        kind: DocumentationNode.Kind,
-        language: SourceLanguage,
-        relativePresentationURL: URL,
-        referenceURL: URL, title: String,
-        abstract: LinkDestinationSummary.Abstract? = nil,
-        availableLanguages: Set<SourceLanguage>,
-        platforms: [LinkDestinationSummary.PlatformAvailability]? = nil,
-        taskGroups: [LinkDestinationSummary.TaskGroup]? = nil,
-        usr: String? = nil,
-        plainTextDeclaration: String? = nil,
-        declarationFragments: LinkDestinationSummary.DeclarationFragments?,
-        navigatorDeclarationFragments: LinkDestinationSummary.DeclarationFragments? = nil,
-        redirects: [URL]? = nil,
-        topicImages: [TopicImage]? = nil,
-        references: [any RenderReference]? = nil,
-        variants: [LinkDestinationSummary.Variant]
-    ) {
-        self.init(
-            kind: kind,
-            language: language,
-            relativePresentationURL: relativePresentationURL,
-            referenceURL: referenceURL,
-            title: title,
-            abstract: abstract,
-            availableLanguages: availableLanguages,
-            platforms: platforms,
-            taskGroups: taskGroups,
-            usr: usr,
-            plainTextDeclaration: plainTextDeclaration,
-            subheadingDeclarationFragments: declarationFragments,
-            navigatorDeclarationFragments: navigatorDeclarationFragments,
-            redirects: redirects,
-            topicImages: topicImages,
-            references: references,
-            variants: variants
-        )
-    }
 }
 
 // MARK: - Accessing the externally linkable elements
 
 public extension DocumentationNode {
-    /// Summarizes the node and all of its child elements that you can link to from outside the bundle.
+    /// Summarizes the node and all of its child elements that you can link to from outside the local documentation.
     ///
     /// - Parameters:
     ///   - context: The context in which references that are found the node's content are resolved in.
@@ -594,7 +410,7 @@ public extension DocumentationNode {
         renderNode: RenderNode
     ) -> [LinkDestinationSummary] {
         guard context.inputs.id == reference.bundleID else {
-            // Don't return anything for external references that don't have a bundle in the context.
+            // Don't return anything for external references in the local context.
             return []
         }
         let urlGenerator = PresentationURLGenerator(context: context, baseURL: context.inputs.baseURL)
@@ -706,7 +522,7 @@ extension LinkDestinationSummary {
         
         // Multi-language symbols need to access the default content via the variant accessors (rdar://86580516)
         let kind = DocumentationNode.kind(forKind: (symbol.kindVariants[summaryTrait] ?? symbol.kind).identifier)
-        let title = symbol.titleVariants[summaryTrait] ?? symbol.title
+        let title = symbol.proseTitleVariants[summaryTrait] ?? symbol.title
         
         func renderSymbolAbstract(_ symbolAbstract: Paragraph?) -> Abstract? {
             guard let abstractParagraph = symbolAbstract, case RenderBlockContent.paragraph(let p)? = compiler.visitParagraph(abstractParagraph).first else {
@@ -755,7 +571,7 @@ extension LinkDestinationSummary {
                 kind: nilIfEqual(main: kind, variant: symbol.kindVariants[trait].map { DocumentationNode.kind(forKind: $0.identifier) }),
                 language: nilIfEqual(main: language, variant: sourceLanguage),
                 relativePresentationURL: nil, // The symbol variant uses the same relative path
-                title: nilIfEqual(main: title, variant: symbol.titleVariants[trait]),
+                title: nilIfEqual(main: title, variant: symbol.proseTitleVariants[trait]),
                 abstract: nilIfEqual(main: abstract, variant: abstractVariant),
                 usr: nil, // The symbol variant uses the same USR
                 plainTextDeclaration: nilIfEqual(main: plainTextDeclaration, variant: plainTextDeclarationVariant),
@@ -787,25 +603,6 @@ extension LinkDestinationSummary {
             references: references.nilIfEmpty,
             variants: variants
         )
-    }
-}
-
-private extension [[PlatformName?]: SymbolGraph.Symbol.DeclarationFragments] {
-    func mainRenderFragments() -> SymbolGraph.Symbol.DeclarationFragments? {
-        self.min(by: { lhs, rhs in
-            // Join all the platform IDs and use that to get a stable value
-            lhs.key.compactMap(\.?.rawValue).joined() < lhs.key.compactMap(\.?.rawValue).joined()
-        })?.value
-    }
-    
-    func renderDeclarationTokens() -> [DeclarationRenderSection.Token]? {
-        mainRenderFragments()?.declarationFragments.renderDeclarationTokens()
-    }
-}
-
-private extension [SymbolGraph.Symbol.DeclarationFragments.Fragment] {
-    func renderDeclarationTokens() -> [DeclarationRenderSection.Token] {
-        map { .init(fragment: $0, identifier: nil) }
     }
 }
 
