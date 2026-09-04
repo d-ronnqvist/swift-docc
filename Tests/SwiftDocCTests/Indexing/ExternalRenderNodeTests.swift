@@ -627,7 +627,7 @@ class ExternalRenderNodeTests: XCTestCase {
     }
 }
 
-private class TestExternalRenderNodeOutputConsumer: ConvertOutputConsumer, ExternalNodeConsumer {
+private class TestExternalRenderNodeOutputConsumer: _WillBeMadeNonPublicConvertOutputConsumer, ExternalNodeConsumer {
     let indexBuilder: Synchronized<NavigatorIndex.Builder>!
 
     init(indexBuilder: NavigatorIndex.Builder) {
