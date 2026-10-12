@@ -14,6 +14,11 @@ extension HTMLNode {
         let name: String
         let value: String
         
+        /// A custom raw attribute
+        package static func customRaw(name: String, value: String) -> Attribute { .init(name: name, value: value) }
+        
+        // MARK: Known attributes
+        
         /// A short, abbreviated description of a `<th>` element's content.
         package static func abbr(_ description: String) -> Attribute { .init(name: "abbr", value: description) }
 

@@ -199,10 +199,23 @@ package struct HTMLRenderer {
         }
         
         // Draw a background color for the hero section and an article/collection glyph
-        let hero = section(
-            attributes: goal == .richness ? [.id("hero"), .class(article.topics == nil ? "article" : "api-collection")] : [],
-            contents: consume heroElements
-        )
+        let hero: HTMLNode
+        if goal == .conciseness {
+            hero = section(contents: consume heroElements)
+        } else {
+//            let fileName = article.topics == nil ? "article" : "api-collection"
+            hero = div(attributes: [.id("hero"), .class(article.topics == nil ? "article" : "api-collection")], contents: [
+                section(contents: consume heroElements)
+//                img(attributes: [.src(renderer.path(to: URL(string: "/images/\(reference.bundleID.rawValue)/\(fileName).svg)")!))])
+            ])
+        }
+//        
+//                
+//        
+//        section(
+//            attributes: goal == .richness ? [.id("hero"), .class(article.topics == nil ? "article" : "api-collection")] : [],
+//            contents: consume heroElements
+//        )
         
         var articleElements = [consume hero]
         
@@ -320,11 +333,15 @@ package struct HTMLRenderer {
             heroElements.append(makeDeprecationSummaryAside(for: deprecationMessage))
         }
         
-        let hero = section(
-            // Draw a background color for the hero section and a module glyph
-            attributes: isModule && goal == .richness ? [.id("hero"), .class("module")] : [],
-            contents: consume heroElements
-        )
+        let hero: HTMLNode
+        if goal == .richness, isModule {
+            hero = div(attributes: [.id("hero"), .class("module")], contents: [
+                section(contents: consume heroElements)
+//                img(attributes: [.src(renderer.path(to: URL(string: "/images/\(reference.bundleID.rawValue)/module.svg)")!))])
+            ])
+        } else {
+            hero = section(contents: consume heroElements)
+        }
         
         var articleElements = [consume hero]
         

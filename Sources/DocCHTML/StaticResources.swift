@@ -40,6 +40,7 @@ package enum StaticResources {
     
     package static let allFiles = [
         referenceStyleSheet,
+        referenceJavaScript,
         // Page kind icons
         apiCollectionIcon,
         articleIcon,
@@ -82,6 +83,228 @@ package enum StaticResources {
   
   --font-default: "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: Menlo, monospace;
+  
+  --nav-width: 320px;
+}
+
+#page-container {
+    display: flex;
+}
+
+#nav-resize-handle {
+    width: 5px;
+/*    background: cyan;*/
+    cursor: col-resize;
+    border-right: 1px solid var(--color-grid);
+    box-sizing: border-box;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+/*float: right;*/
+/*    inset-inline-end: 0;*/
+/*    width: 5px;*/
+    height: 100%;
+/*    -webkit-user-select: none;*/
+/*    -moz-user-select: none;*/
+    user-select: none;
+/*    z-index: 1;*/
+    transition: border-right .15s;
+/*    transform: translateX(50%);*/
+
+    &:hover {
+        border-right: 5px solid var(--color-grid);
+    }
+}
+
+#quick-nav {
+    &::backdrop {
+        background: rgba(0,0,0,0.3);
+    }
+    
+    background: red;
+    width: 400px;
+    height: 400px;
+    margin: auto;
+    
+    
+}
+
+
+main {
+/*    margin-left: var(--nav-width);*/
+/*    border-left: 1px solid var(--color-grid);*/
+    flex-grow: 1;
+}
+
+#nav-container {
+    position: relative;
+/*    background: #eee;*/
+/*    display: block;*/
+    float: left;
+    left: 0;
+    top: 0;
+    width: var(--nav-width);
+/*    height: mvh;*/
+height: 100%;
+    
+    overflow-y: scroll;
+    
+    span, a {
+        display: block;
+        font-size: 17px;
+        color: black;
+    }
+/*    summary {*/
+/*        display: flex;*/
+/*    }*/
+    summary > a {
+        display: inline;
+/*        width: 100%;*/
+/*        background: yellow;*/
+    }
+    a {
+        text-decoration: none;
+/*        display: inline-block;*/
+/*        background: cyan;*/
+    }
+    
+    .groupMarker {
+        color: rgb(102, 102, 102);
+        font-weight: 600;
+    }
+    
+    &> footer {
+        background: red;
+        
+        position: fixed;
+        bottom: 0;
+        width: var(--nav-width);
+        height: 40px;
+        display: flex;
+    }
+    
+
+/*    summary {*/
+/*        list-style-image: url('data:image/svg+xml,<svg height="14px" width="14px" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg"><rect width="14" height="14" fill="yellow"/><path stroke="black" fill="none" stroke-width="1" d="M4 1 l6 6 l-6 6"></path></svg>');*/
+/*    }*/
+/*    details[open] > summary {*/
+/*        list-style-image: url('data:image/svg+xml,<svg height="14px" width="14px" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg"><rect width="14" height="14" fill="cyan"/><path stroke="black" fill="none" stroke-width="1" d="M1 4 l6 6 l6 -6"></path></svg>');*/
+/*    }*/
+    summary {
+        list-style-image: url('data:image/svg+xml,<svg height="11px" width="11px" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg"><path stroke="black" fill="none" stroke-width="1" d="M4 1 l6 6 l-6 6"></path></svg>');
+    }
+    details[open] > summary {
+        list-style-image: url('data:image/svg+xml,<svg height="11px" width="11px" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg"><path stroke="black" fill="none" stroke-width="1" d="M1 4 l6 6 l6 -6"></path></svg>');
+    }
+    
+    details {
+        summary, span, &> a {
+            margin: 2px;
+            padding: 2px 6px;
+            /*        padding-left: 3px;*/
+                    padding-top: 5px;
+            /*        padding-bottom: 3px;*/
+            border-radius: 4px;
+            /*        width: 100%;*/
+            white-space: nowrap;
+            overflow-x: hidden;
+            text-overflow: ellipsis;
+            
+            height: 24px;
+        }
+    }
+
+    ::details-content {
+        padding-left: 15px;
+    }
+    
+    details:has(.selected) >summary {
+        font-weight: 700;
+    }
+    
+    .selected {
+        background: color-mix(in srgb, var(--color-grid) 33%, white);
+        font-weight: 700;
+    }
+    
+    summary:hover, a:hover {
+/*        background: color-mix(in srgb, var(--color-standard-blue) 15%, white);*/
+        background: color-mix(in srgb, #d1d1ff 33%, white);
+    }
+    .groupMarker:hover { background: none;}
+
+    .class::before,
+    .struct::before,
+    .var::before,
+    .func::before,
+    .op::before,
+/*    .article::before,*/
+    .protocol::before,
+    .enum::before,
+    .method::before,
+    .typealias::before,
+    .associatedtype::before,
+    .init::before,
+    .property::before
+    {
+        font-size: 12px;
+        width: 13px;
+        height: 13px;
+        font-family: var(--font-default);
+        line-height: 12px;
+        font-weight: 700;
+        display: inline-block;
+        border: 1px solid rgb(102, 102, 102);
+        color: rgb(102, 102, 102);
+/*        padding: 1px 2px;*/
+        text-align: center;
+        margin-right: 6px;
+        position: relative;
+        top: -2px;
+    }
+
+    .article::before    {
+        content: url(article.svg);
+        width: 13px;
+        height: 13px;
+        margin-right: 6px;
+        position: relative;
+        top: 1px;
+    }
+    .collection::before {
+        content: url(api-collection.svg);
+        
+        --icon-size: 15px;
+        width: var(--icon-size);
+        height: var(--icon-size);
+        
+        
+        
+        
+/*        display: inline-flex;*/
+        margin-right: 6px;
+        position: relative;
+/*        background: yellow;*/
+        top: 1px;
+    }
+    
+    .class::before      { content: "C"}
+    .struct::before     { content: "S"}
+    .var::before        { content: "v"}
+    .protocol::before   { content: "Pr"}
+    .enum::before       { content: "E"}
+    .property::before   { content: "P"}
+    .typealias::before  { content: "T"}
+    .associatedtype::before  { content: "A"}
+    .init::before,
+    .method::before     { content: "M"}
+    .func::before       { content: "𝒇"}
+    .op::before       { content: "±"}
+    
+    .groupMarker, details > a {
+        padding-left: 24px;
+    }
 }
 
 /* Hide and show language specific content by modifying these classes through JS */
@@ -391,23 +614,26 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 #hero {
-  margin-bottom: 40px;
+/*  margin-bottom: 40px;*/
   
   position: relative;
   clip-path: inset(0 -50%);
   
   /* Draw the background in a pseudo element so that it can move behind the icon */
-  &:before {
-    content: "";
+/*  &:before {*/
+/*    content: "";*/
     background: #f0f0f0;
     
-    position: absolute;
-    top: 0;
-    left: -50%;
-    width: 200%;
-    height: 100%;
-    z-index: -2;
-  }
+/*    position: absolute;*/
+/*    top: 0;*/
+/*    left: -50%;*/
+/*    width: 200%;*/
+    width: 100%;
+/*    left: -103px;*/
+/*    width: calc(100vw - var(--nav-width));*/
+/*    height: 100%;*/
+/*    z-index: -2;*/
+/*  }*/
 }
 
 /* Add background icons for articles, API collections, and module pages */
@@ -730,7 +956,7 @@ table {
 
 /* Asides */
 
-aside {
+main aside {
   background-color: rgb(245, 245, 245);
   border: 0px solid rgb(102, 102, 102);
   border-inline-start-width: 6px;
@@ -912,6 +1138,243 @@ body > footer {
     }
   }
 }
+""".utf8))
+    
+    // MARK: Scripts
+    
+    static let referenceJavaScript = File(filename: "reference.js", data: Data("""
+
+
+
+function languageChanged() {
+    const picker = document.querySelector('#language-toggle');
+    
+    // Hide all
+    for (i = 0; i < picker.options.length; i++) {
+        const name = picker.options[i].value;
+        const collection = document.getElementsByClassName(name+"-only");
+        for (let i = 0; i < collection.length; i++) {
+            collection[i].style.display = "none";
+        }
+    }
+    
+    // Show selected
+    const name = picker.value;
+    const collection = document.getElementsByClassName(name+"-only");
+    for (let i = 0; i < collection.length; i++) {
+        collection[i].style.display = "inherit"; // the default
+    }
+}
+
+
+
+
+const pageContainer = document.getElementById("page-container");
+const pagePathComponents = pageContainer.dataset.path.split("/");
+
+function relativePath(target) {
+    console.log(target);
+    const to = target.split("/");
+    if (to == pagePathComponents) {
+        return "."
+    }
+    
+    let commonPrefixLength = 0;
+    const lengthLimit = Math.min(pagePathComponents.length, to.length);
+    while (commonPrefixLength < lengthLimit && pagePathComponents[commonPrefixLength] == to[commonPrefixLength]) {
+        commonPrefixLength++;
+    }
+    
+    return Array(pagePathComponents.length - commonPrefixLength).fill("..")
+    .concat(to.slice(commonPrefixLength))
+    .join("/");
+}
+
+const indexData = await fetch(relativePath("/index/index.json"))
+    .then(response => response.json())
+const modules = indexData.interfaceLanguages["swift"]
+
+function makeNavigationSidebar() {
+    const aside = document.createElement("aside");
+    const navContainer = document.createElement("nav");
+    navContainer.id = "nav-container";
+    aside.appendChild(navContainer);
+    
+    const main = pageContainer.children[0];
+    pageContainer.insertBefore(aside, main);
+    
+    
+    //const navContainer  = document.getElementById("nav-container");
+    
+    const pagePathComponents = pageContainer.dataset.path.split("/");
+    function relativePath(target) {
+        const to = target.split("/");
+        if (to == pagePathComponents) {
+            return "."
+        }
+        
+        let commonPrefixLength = 0;
+        const lengthLimit = Math.min(pagePathComponents.length, to.length);
+        while (commonPrefixLength < lengthLimit && pagePathComponents[commonPrefixLength] == to[commonPrefixLength]) {
+            commonPrefixLength++;
+        }
+        
+        return Array(pagePathComponents.length - commonPrefixLength).fill("..")
+        .concat(to.slice(commonPrefixLength))
+        .join("/");
+    }
+    
+    function makeElementFor(child, container) {
+        // TODO: "icon" for the custom icon file name
+        
+        if (child.type == "groupMarker") {
+            const span = document.createElement("span");
+            const title = document.createTextNode(child.title);
+            span.appendChild(title);
+            span.className = "groupMarker";
+            
+            container.appendChild(span);
+        } else if (child.children === undefined) {
+            const anchor = document.createElement("a");
+            anchor.href = relativePath(child.path + "/index.html");
+            const title = document.createTextNode(child.title);
+            anchor.appendChild(title);
+            
+            anchor.className = child.type;
+            
+            container.appendChild(anchor);
+        } else {
+            const details = document.createElement("details");
+            const summary = document.createElement("summary");
+            
+            const anchor = document.createElement("a");
+            anchor.href = relativePath(child.path + "/index.html");
+            const title = document.createTextNode(child.title);
+            anchor.appendChild(title);
+            
+            summary.className = child.type;
+            summary.appendChild(anchor);
+            details.appendChild(summary);
+            
+            details.addEventListener("toggle", function() {
+                for (let i = 0; i < child.children.length; i++) {
+                    const innerChild = child.children[i];
+                    makeElementFor(innerChild, details);
+                }
+            }, { once: true });
+            
+            container.appendChild(details);
+        }
+    }
+    
+    // Build up the navigator sidebar
+    for (let i = 0; i < modules.length; i++) {
+        let module = modules[i]
+        
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        details.appendChild(summary);
+        
+        details.className = module.type;
+        const title = document.createTextNode(module.title);
+        summary.appendChild(title);
+        
+        navContainer.appendChild(details);
+        details.open = true;
+        
+        for (let j = 0; j < module.children.length; j++) {
+            const child = module.children[j];
+            
+            makeElementFor(child, details);
+        }
+    }
+    
+    
+    
+    
+    function makeSidebarResizeHandle() {
+        const handle = document.createElement("div");
+        handle.id = "nav-resize-handle";
+//        pageContainer.insertBefore(handle, main);
+        navContainer.appendChild(handle);
+        
+        // track current mouse position in x var
+        let startX, startWidth;
+        
+        function handleDrag(event) {
+            const width = startWidth + event.clientX - startX;
+            
+            if ( width < 700 ) {
+                navContainer.style.width = width + 'px';
+            }
+        }
+        function removeUpAndMoveHandlers() {
+            document.removeEventListener("mouseup", removeUpAndMoveHandlers);
+            document.removeEventListener("mousemove", handleDrag);
+        }
+        
+        function initDragHandlers(event) {
+            startX = event.clientX;
+            
+            const sbWidth = window.getComputedStyle(navContainer).width;
+            startWidth = parseInt( sbWidth, 10 );
+            
+            document.addEventListener("mousemove", handleDrag);
+            document.addEventListener("mouseup", removeUpAndMoveHandlers);
+        }
+        
+        handle.addEventListener("mousedown", initDragHandlers);
+    }
+    
+    makeSidebarResizeHandle();
+    
+    
+    
+    function makeFilterBar() {
+        const quickNav = document.createElement("div");
+        quickNav.id = "quick-nav";
+        quickNav.popover = "";
+        document.body.appendChild(quickNav);
+        
+        
+        const footer = document.createElement("footer");
+        const filterField = document.createElement("input");
+        filterField.type = "text";
+        footer.appendChild(filterField);
+        
+        const button = document.createElement("button");
+        button.accessKey = "/";
+        button.popoverTargetElement = quickNav;
+//        button.popoverTargetAction = "toggle";
+        footer.appendChild(button);
+        
+        aside.appendChild(footer);
+    }
+    
+    makeFilterBar();
+    
+    
+    
+    const header = document.body.children[0];
+    const button = header.children[0];
+    button.addEventListener("click", () => {
+        aside.hidden = !(aside.hidden);
+    });
+
+}
+
+//if (location.protocol != "file:") {
+    // The browser cannot load the navigator "index.json" file unless it's served by a web server due to CORS rules.
+    makeNavigationSidebar();
+//}
+
+
+
+
+
+        
+
+        
 """.utf8))
     
     // MARK: Icons

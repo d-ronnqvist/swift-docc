@@ -50,6 +50,7 @@ package extension HTMLRenderer {
                 .href("\(pathPrefixToArchiveRoot)reference.css"),
                 .rel(.stylesheet),
             ),
+            script(attributes: [.defer, .src("\(pathPrefixToArchiveRoot)reference.js"), .type("module")], contents: []),
             title(text: metadata.title),
         ]
         if let description = metadata.description {
@@ -79,7 +80,14 @@ package extension HTMLRenderer {
         ]))
         
         // 3. The unique documentation content for this page
-        bodyElements.append(main(contents: [mainContent]))
+        bodyElements.append(
+            div(attributes: [
+                .id("page-container"),
+                .customRaw(name: "data-path", value: NodeURLGenerator.fileSafeReferencePath(reference, lowercased: true))
+            ], contents: [
+                main(contents: [mainContent])
+            ])
+        )
         
         // 4. The default footer
         bodyElements.append(footer(contents: [
